@@ -230,7 +230,7 @@ static VALUE socket_recv (VALUE self_, VALUE flags_)
     return message;
 }
 
-extern "C" void Init_librbzmq ()
+extern "C" void Init_zmq ()
 {
     VALUE zmq_module = rb_define_module ("ZMQ");
     VALUE context_type = rb_define_class_under (zmq_module, "Context",
