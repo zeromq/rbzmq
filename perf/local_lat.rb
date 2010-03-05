@@ -28,7 +28,7 @@ message_size = ARGV[1].to_i
 roundtrip_count = ARGV[2].to_i
 			
 ctx = ZMQ::Context.new(1, 1, 0)
-s = ZMQ::Socket.new(ctx, ZMQ::REP);
+s = ctx.socket(ZMQ::REP);
 s.bind(bind_to);
 
 for i in 0...roundtrip_count do

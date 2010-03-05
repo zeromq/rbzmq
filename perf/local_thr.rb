@@ -28,7 +28,7 @@ message_size = ARGV[1].to_i
 message_count = ARGV[2].to_i
 					
 ctx = ZMQ::Context.new(1, 1, 0)
-s = ZMQ::Socket.new(ctx, ZMQ::SUB);
+s = ctx.socket(ZMQ::SUB);
 s.setsockopt(ZMQ::SUBSCRIBE, "");
 
 #  Add your socket options here.

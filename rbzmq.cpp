@@ -22,6 +22,8 @@
 #include <ruby.h>
 #include <zmq.h>
 
+VALUE socket_type;
+
 static void context_free (void *ctx)
 {
     if (ctx) {
@@ -63,23 +65,17 @@ static VALUE socket_alloc (VALUE class_)
     return rb_data_object_alloc (class_, NULL, 0, socket_free);
 }
 
-static VALUE socket_initialize (VALUE self_, VALUE context_, VALUE type_)
+static VALUE context_socket (VALUE self_, VALUE type_)
 {
-    assert (!DATA_PTR (self_));
-
-    if (strcmp (rb_obj_classname (context_), "ZMQ::Context") != 0) {
-        rb_raise (rb_eArgError, "expected ZMQ::Context object");
-        return Qnil;
-    }
-
-    void *s = zmq_socket (DATA_PTR (context_), NUM2INT (type_));
+    void * c = NULL;
+    Data_Get_Struct(self_, void, c);
+    void * s = zmq_socket(c, NUM2INT(type_));
     if (!s) {
-        rb_raise (rb_eRuntimeError, zmq_strerror (zmq_errno ()));
+        rb_raise(rb_eRuntimeError, zmq_strerror (zmq_errno ()));
         return Qnil;
     }
 
-    DATA_PTR (self_) = (void*) s;
-    return self_;
+    return Data_Wrap_Struct(socket_type, 0, socket_free, s);
 }
 
 
@@ -230,6 +226,19 @@ static VALUE socket_recv (VALUE self_, VALUE flags_)
     return message;
 }
 
+static VALUE socket_close (VALUE self_)
+{
+    void * s = NULL;
+    Data_Get_Struct(self_, void, s);
+    int rc = zmq_close(s);
+    if (rc != 0) {
+        rb_raise (rb_eRuntimeError, zmq_strerror (zmq_errno ()));
+        return Qnil;
+    }
+
+    return Qnil;
+}
+
 extern "C" void Init_zmq ()
 {
     VALUE zmq_module = rb_define_module ("ZMQ");
@@ -238,12 +247,11 @@ extern "C" void Init_zmq ()
     rb_define_alloc_func (context_type, context_alloc);
     rb_define_method (context_type, "initialize",
         (VALUE(*)(...)) context_initialize, 3);
+    rb_define_method (context_type, "socket",
+        (VALUE(*)(...)) context_socket, 1);
 
-    VALUE socket_type = rb_define_class_under (zmq_module, "Socket",
-        rb_cObject);
-    rb_define_alloc_func (socket_type, socket_alloc);
-    rb_define_method (socket_type, "initialize",
-        (VALUE(*)(...)) socket_initialize, 2);
+    socket_type = rb_define_class_under (zmq_module, "Socket", rb_cObject);
+    rb_undef_alloc_func(socket_type);
     rb_define_method (socket_type, "setsockopt",
         (VALUE(*)(...)) socket_setsockopt, 2);
     rb_define_method (socket_type, "bind",
@@ -256,6 +264,8 @@ extern "C" void Init_zmq ()
         (VALUE(*)(...)) socket_flush, 0);
     rb_define_method (socket_type, "recv",
         (VALUE(*)(...)) socket_recv, 1);
+    rb_define_method (socket_type, "close",
+        (VALUE(*)(...)) socket_close, 0);
 
     rb_define_const (zmq_module, "HWM", INT2NUM (ZMQ_HWM));
     rb_define_const (zmq_module, "LWM", INT2NUM (ZMQ_LWM));
