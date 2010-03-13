@@ -184,19 +184,6 @@ static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
     return Qtrue;
 }
 
-static VALUE socket_flush (VALUE self_)
-{
-    assert (DATA_PTR (self_));
-
-    int rc = zmq_flush (DATA_PTR (self_));
-    if (rc != 0) {
-        rb_raise (rb_eRuntimeError, zmq_strerror (zmq_errno ()));
-        return Qnil;
-    }
-
-    return Qnil;
-}
-
 static VALUE socket_recv (VALUE self_, VALUE flags_)
 {
     assert (DATA_PTR (self_));
@@ -260,8 +247,6 @@ extern "C" void Init_zmq ()
         (VALUE(*)(...)) socket_connect, 1);
     rb_define_method (socket_type, "send",
         (VALUE(*)(...)) socket_send, 2);
-    rb_define_method (socket_type, "flush",
-        (VALUE(*)(...)) socket_flush, 0);
     rb_define_method (socket_type, "recv",
         (VALUE(*)(...)) socket_recv, 1);
     rb_define_method (socket_type, "close",
@@ -281,7 +266,6 @@ extern "C" void Init_zmq ()
     rb_define_const (zmq_module, "RCVBUF", INT2NUM (ZMQ_RCVBUF));
 
     rb_define_const (zmq_module, "NOBLOCK", INT2NUM (ZMQ_NOBLOCK));
-    rb_define_const (zmq_module, "NOFLUSH", INT2NUM (ZMQ_NOFLUSH));
 
     rb_define_const (zmq_module, "P2P", INT2NUM (ZMQ_P2P));
     rb_define_const (zmq_module, "SUB", INT2NUM (ZMQ_SUB));
