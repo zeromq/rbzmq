@@ -22,6 +22,35 @@
 #include <ruby.h>
 #include <zmq.h>
 
+#if defined _MSC_VER
+#ifndef int8_t
+typedef __int8 int8_t;
+#endif
+#ifndef int16_t
+typedef __int16 int16_t;
+#endif
+#ifndef int32_t
+typedef __int32 int32_t;
+#endif
+#ifndef int64_t
+typedef __int64 int64_t;
+#endif
+#ifndef uint8_t
+typedef unsigned __int8 uint8_t;
+#endif
+#ifndef uint16_t
+typedef unsigned __int16 uint16_t;
+#endif
+#ifndef uint32_t
+typedef unsigned __int32 uint32_t;
+#endif
+#ifndef uint64_t
+typedef unsigned __int64 uint64_t;
+#endif
+#else
+#include <stdint.h>
+#endif
+
 VALUE socket_type;
 
 static void context_free (void *ctx)
@@ -94,11 +123,11 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     case ZMQ_RECOVERY_IVL:
     case ZMQ_MCAST_LOOP:
         {
-            long optval = FIX2LONG (optval_);
+            uint64_t optval = FIX2LONG (optval_);
 
             //  Forward the code to native 0MQ library.
             rc = zmq_setsockopt (DATA_PTR (self_), NUM2INT (option_),
-                (void *) &optval, 4);
+                (void*) &optval, sizeof (optval));
         }
         break;
 
