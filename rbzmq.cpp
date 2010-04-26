@@ -296,7 +296,9 @@ extern "C" void Init_zmq ()
 
     rb_define_const (zmq_module, "NOBLOCK", INT2NUM (ZMQ_NOBLOCK));
 
+    //  TODO: P2P is to be removed.
     rb_define_const (zmq_module, "P2P", INT2NUM (ZMQ_P2P));
+    rb_define_const (zmq_module, "PAIR", INT2NUM (ZMQ_PAIR));
     rb_define_const (zmq_module, "SUB", INT2NUM (ZMQ_SUB));
     rb_define_const (zmq_module, "PUB", INT2NUM (ZMQ_PUB));
     rb_define_const (zmq_module, "REQ", INT2NUM (ZMQ_REQ));
