@@ -73,7 +73,7 @@ static VALUE context_initialize (VALUE self_, VALUE app_threads_,
     void *ctx = zmq_init (NUM2INT (app_threads_), NUM2INT (io_threads_),
         NUM2INT (flags_));
     if (!ctx) {
-        rb_raise (rb_eRuntimeError, zmq_strerror (zmq_errno ()));
+        rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
     }
 
@@ -95,7 +95,7 @@ static VALUE context_socket (VALUE self_, VALUE type_)
     Data_Get_Struct(self_, void, c);
     void * s = zmq_socket(c, NUM2INT(type_));
     if (!s) {
-        rb_raise(rb_eRuntimeError, zmq_strerror (zmq_errno ()));
+        rb_raise(rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
     }
 
@@ -201,12 +201,12 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
         break;
 
     default:
-        rb_raise (rb_eRuntimeError, zmq_strerror (EINVAL));
+        rb_raise (rb_eRuntimeError, "%s", zmq_strerror (EINVAL));
         return Qnil;
     }
 
     if (rc != 0) {
-        rb_raise (rb_eRuntimeError, zmq_strerror (zmq_errno ()));
+        rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
     }
 
@@ -220,7 +220,7 @@ static VALUE socket_bind (VALUE self_, VALUE addr_)
 
     int rc = zmq_bind (DATA_PTR (self_), rb_string_value_cstr (&addr_));
     if (rc != 0) {
-        rb_raise (rb_eRuntimeError, zmq_strerror (zmq_errno ()));
+        rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
     }
 
@@ -233,7 +233,7 @@ static VALUE socket_connect (VALUE self_, VALUE addr_)
 
     int rc = zmq_connect (DATA_PTR (self_), rb_string_value_cstr (&addr_));
     if (rc != 0) {
-        rb_raise (rb_eRuntimeError, zmq_strerror (zmq_errno ()));
+        rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
     }
 
@@ -257,7 +257,7 @@ static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
     zmq_msg_t msg;
     int rc = zmq_msg_init_size (&msg, RSTRING_LEN (msg_));
     if (rc != 0) {
-        rb_raise (rb_eRuntimeError, zmq_strerror (zmq_errno ()));
+        rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
     }
     memcpy (zmq_msg_data (&msg), RSTRING_PTR (msg_), RSTRING_LEN (msg_));
@@ -270,7 +270,7 @@ static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
     }
 
     if (rc != 0) {
-        rb_raise (rb_eRuntimeError, zmq_strerror (zmq_errno ()));
+        rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
         return Qnil;
@@ -304,7 +304,7 @@ static VALUE socket_recv (VALUE self_, VALUE flags_)
     }
 
     if (rc != 0) {
-        rb_raise (rb_eRuntimeError, zmq_strerror (zmq_errno ()));
+        rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
         return Qnil;
@@ -337,7 +337,7 @@ static VALUE socket_close (VALUE self_)
     Data_Get_Struct(self_, void, s);
     int rc = zmq_close(s);
     if (rc != 0) {
-        rb_raise (rb_eRuntimeError, zmq_strerror (zmq_errno ()));
+        rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
     }
 
