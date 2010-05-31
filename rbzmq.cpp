@@ -89,11 +89,6 @@ static void socket_free (void *s)
     }
 }
 
-static VALUE socket_alloc (VALUE class_)
-{
-    return rb_data_object_alloc (class_, NULL, 0, socket_free);
-}
-
 static VALUE context_socket (VALUE self_, VALUE type_)
 {
     void * c = NULL;
