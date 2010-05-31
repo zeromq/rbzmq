@@ -20,6 +20,11 @@
 #include <assert.h>
 #include <string.h>
 #include <ruby.h>
+#ifdef HAVE_RUBY_IO_H
+#include <ruby/io.h>
+#else
+#include <rubyio.h>
+#endif
 #include <zmq.h>
 
 #if defined _MSC_VER
@@ -81,6 +86,195 @@ static VALUE context_initialize (VALUE self_, VALUE app_threads_,
     return self_;
 }
 
+struct poll_state {
+    int event;
+    int nitems;
+    zmq_pollitem_t *items;
+    VALUE io_objects;  
+};
+
+typedef VALUE(*iterfunc)(...);
+
+static VALUE poll_add_item(VALUE io_, void *ps_) {
+    struct poll_state *state = (struct poll_state *)ps_;
+
+    long i;
+    
+    for (i = 0; i < RARRAY_LEN(state->io_objects); i++) {
+        if (RARRAY_PTR(state->io_objects)[i] == io_) {
+#ifdef HAVE_RUBY_IO_H
+            state->items[i].events |= state->event;
+            return Qnil;
+#else
+            if (CLASS_OF(io_) == socket_type) {
+                state->items[i].events |= state->event;
+                return Qnil;
+            }
+
+            OpenFile *fptr;
+            GetOpenFile(io_, fptr);
+            
+            if (state->event == ZMQ_POLLOUT &&
+                GetWriteFile(fptr) != NULL &&
+                fileno(GetWriteFile(fptr)) != state->items[i].fd) {
+                break;
+            }
+            else {
+                state->items[i].events |= state->event;
+                return Qnil;
+            }
+#endif
+        }
+    }
+    
+    /* Not found in array.  Add a new poll item. */
+    rb_ary_push(state->io_objects, io_);
+    
+    zmq_pollitem_t *item = &state->items[state->nitems];
+    state->nitems++;
+
+    item->events = state->event;
+
+    if (CLASS_OF(io_) == socket_type) {
+        item->socket = DATA_PTR (io_);
+        item->fd = -1;
+    }
+    else {
+        item->socket = NULL;
+
+#ifdef HAVE_RUBY_IO_H
+        rb_io_t *fptr;
+
+        GetOpenFile(io_, fptr);
+        item->fd = fileno(rb_io_stdio_file(fptr));
+#else
+        OpenFile *fptr;
+        
+        GetOpenFile(io_, fptr);
+        
+        if (state->event == ZMQ_POLLIN && GetReadFile(fptr) != NULL) {
+            item->fd = fileno(GetReadFile(fptr));
+        }
+        else if (state->event == ZMQ_POLLOUT && GetWriteFile(fptr) != NULL) {
+            item->fd = fileno(GetWriteFile(fptr));
+        }
+        else if (state->event == ZMQ_POLLERR) {
+            if (GetReadFile(fptr) != NULL)
+                item->fd = fileno(GetReadFile(fptr));
+            else
+                item->fd = fileno(GetWriteFile(fptr));
+        }
+#endif
+    }
+    
+    return Qnil;
+}
+
+#ifdef HAVE_RUBY_INTERN_H
+
+struct zmq_poll_args {
+    zmq_pollitem_t *items;
+    int nitems;
+    long timeout_usec;
+    int rc;
+};
+
+static VALUE zmq_poll_blocking (void* args_)
+{
+    struct zmq_poll_args *poll_args = (struct zmq_poll_args *)args_;
+    
+    poll_args->rc = zmq_poll(poll_args->items, poll_args->nitems, poll_args->timeout_usec);
+    
+    return Qnil;
+}
+
+#endif
+    
+static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
+{
+    VALUE readset, writeset, errset, timeout;
+    rb_scan_args (argc_, argv_, "13", &readset, &writeset, &errset, &timeout);
+
+    long timeout_usec;
+    int rc, nitems, i;
+    zmq_pollitem_t *items, *item;
+    
+    if (NIL_P (timeout))
+        timeout_usec = -1;
+    else
+        timeout_usec = NUM2INT (timeout) * 1000000;
+    
+    /* Conservative estimate for nitems before we traverse the lists. */
+    nitems = RARRAY_LEN (readset) +
+             (NIL_P (writeset) ? 0 : RARRAY_LEN (writeset)) +
+             (NIL_P (errset) ? 0 : RARRAY_LEN (errset));
+    items = (zmq_pollitem_t*)ruby_xmalloc(sizeof(zmq_pollitem_t) * nitems);
+
+    struct poll_state ps;
+    ps.nitems = 0;
+    ps.items = items;
+    ps.io_objects = rb_ary_new ();
+
+    ps.event = ZMQ_POLLIN;
+    rb_iterate(rb_each, readset, (iterfunc)poll_add_item, (VALUE)&ps);
+
+    if (!NIL_P (writeset)) {
+        ps.event = ZMQ_POLLOUT;
+        rb_iterate(rb_each, writeset, (iterfunc)poll_add_item, (VALUE)&ps);
+    }
+
+    if (!NIL_P (errset)) {
+        ps.event = ZMQ_POLLERR;
+        rb_iterate(rb_each, errset, (iterfunc)poll_add_item, (VALUE)&ps);
+    }
+    
+    /* Reset nitems to the actual number of zmq_pollitem_t records we're sending. */
+    nitems = ps.nitems;
+
+#ifdef HAVE_RUBY_INTERN_H
+    if (timeout_usec != 0) {
+        struct zmq_poll_args poll_args;
+        poll_args.items = items;
+        poll_args.nitems = nitems;
+        poll_args.timeout_usec = timeout_usec;
+
+        rb_thread_blocking_region (zmq_poll_blocking, (void*)&poll_args, NULL, NULL);
+        rc = poll_args.rc;
+    }
+    else
+#else
+        rc = zmq_poll (items, nitems, timeout_usec);
+#endif
+    
+    if (rc == -1) {
+        rb_raise(rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
+        return Qnil;
+    }
+    else if (rc == 0)
+        return Qnil;
+    
+    VALUE read_active = rb_ary_new ();
+    VALUE write_active = rb_ary_new ();
+    VALUE err_active = rb_ary_new ();
+    
+    for (i = 0, item = &items[0]; i < nitems; i++, item++) {
+        if (item->revents != 0) {
+            VALUE io = RARRAY_PTR (ps.io_objects)[i];
+            
+            if (item->revents & ZMQ_POLLIN)
+                rb_ary_push (read_active, io);
+            if (item->revents & ZMQ_POLLOUT)
+                rb_ary_push (write_active, io);
+            if (item->revents & ZMQ_POLLERR)
+                rb_ary_push (err_active, io);
+        }
+    }
+    
+    ruby_xfree(items);
+    
+    return rb_ary_new3 (3, read_active, write_active, err_active);
+}
+
 static void socket_free (void *s)
 {
     if (s) {
@@ -93,7 +287,7 @@ static VALUE context_socket (VALUE self_, VALUE type_)
 {
     void * c = NULL;
     Data_Get_Struct(self_, void, c);
-    void * s = zmq_socket(c, NUM2INT(type_));
+    void * s = zmq_socket(c, NUM2INT (type_));
     if (!s) {
         rb_raise(rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
@@ -241,18 +435,30 @@ static VALUE socket_connect (VALUE self_, VALUE addr_)
 }
 
 #ifdef HAVE_RUBY_INTERN_H
-static VALUE socket_send_blocking (void* args_)
+struct zmq_send_recv_args {
+    void *socket;
+    zmq_msg_t *msg;
+    int flags;
+    int rc;
+};
+
+static VALUE zmq_send_blocking (void* args_)
 {
-    VALUE self_ = RARRAY_PTR(args_)[0];
-    VALUE msg_ = RARRAY_PTR(args_)[1];
-    VALUE flags_ = RARRAY_PTR(args_)[2];
-#else
+    struct zmq_send_recv_args *send_args = (struct zmq_send_recv_args *)args_;
+
+    send_args->rc = zmq_send(send_args->socket, send_args->msg, send_args->flags);
+    
+    return Qnil;
+}
+#endif
+
 static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
 {
-#endif
     assert (DATA_PTR (self_));
 
     Check_Type (msg_, T_STRING);
+
+    int flags = NUM2INT (flags_);
 
     zmq_msg_t msg;
     int rc = zmq_msg_init_size (&msg, RSTRING_LEN (msg_));
@@ -262,7 +468,19 @@ static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
     }
     memcpy (zmq_msg_data (&msg), RSTRING_PTR (msg_), RSTRING_LEN (msg_));
 
-    rc = zmq_send (DATA_PTR (self_), &msg, NUM2INT (flags_));
+#ifdef HAVE_RUBY_INTERN_H
+    if (!(flags & ZMQ_NOBLOCK)) {
+        struct zmq_send_recv_args send_args;
+        send_args.socket = DATA_PTR (self_);
+        send_args.msg = &msg;
+        send_args.flags = flags;
+        rb_thread_blocking_region (zmq_send_blocking, (void*) &send_args, NULL, NULL);
+        rc = send_args.rc;
+    }
+    else
+#else
+        rc = zmq_send (DATA_PTR (self_), &msg, flags);
+#endif
     if (rc != 0 && zmq_errno () == EAGAIN) {
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
@@ -282,21 +500,39 @@ static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
 }
 
 #ifdef HAVE_RUBY_INTERN_H
-static VALUE socket_recv_blocking (void* args_)
+static VALUE zmq_recv_blocking (void* args_)
 {
-    VALUE self_ = RARRAY_PTR(args_)[0];
-    VALUE flags_ = RARRAY_PTR(args_)[1];
-#else
+    struct zmq_send_recv_args *recv_args = (struct zmq_send_recv_args *)args_;
+
+    recv_args->rc = zmq_recv(recv_args->socket, recv_args->msg, recv_args->flags);
+    
+    return Qnil;
+}
+#endif
+
 static VALUE socket_recv (VALUE self_, VALUE flags_)
 {
-#endif
     assert (DATA_PTR (self_));
+
+    int flags = NUM2INT (flags_);
 
     zmq_msg_t msg;
     int rc = zmq_msg_init (&msg);
     assert (rc == 0);
 
-    rc = zmq_recv (DATA_PTR (self_), &msg, NUM2INT (flags_));
+#ifdef HAVE_RUBY_INTERN_H
+    if (!(flags & ZMQ_NOBLOCK)) {
+        struct zmq_send_recv_args recv_args;
+        recv_args.socket = DATA_PTR (self_);
+        recv_args.msg = &msg;
+        recv_args.flags = flags;
+        rb_thread_blocking_region (zmq_recv_blocking, (void*) &recv_args, NULL, NULL);
+        rc = recv_args.rc;
+    }
+    else
+#else
+        rc = zmq_recv (DATA_PTR (self_), &msg, flags);
+#endif
     if (rc != 0 && zmq_errno () == EAGAIN) {
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
@@ -317,20 +553,6 @@ static VALUE socket_recv (VALUE self_, VALUE flags_)
     return message;
 }
 
-#ifdef HAVE_RUBY_INTERN_H
-static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
-{
-  VALUE args = rb_ary_new3(3, self_, msg_, flags_);
-  return rb_thread_blocking_region(socket_send_blocking, (void*)args, NULL, NULL);
-}
-
-static VALUE socket_recv (VALUE self_, VALUE flags_)
-{
-    VALUE args = rb_ary_new3(2, self_, flags_);
-    return rb_thread_blocking_region(socket_recv_blocking, (void*)args, NULL, NULL);
-}
-#endif
-
 static VALUE socket_close (VALUE self_)
 {
     void * s = NULL;
@@ -347,6 +569,9 @@ static VALUE socket_close (VALUE self_)
 extern "C" void Init_zmq ()
 {
     VALUE zmq_module = rb_define_module ("ZMQ");
+    rb_define_singleton_method (zmq_module, "select",
+        (VALUE(*)(...)) module_select, -1);
+
     VALUE context_type = rb_define_class_under (zmq_module, "Context",
         rb_cObject);
     rb_define_alloc_func (context_type, context_alloc);
