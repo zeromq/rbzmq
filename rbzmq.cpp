@@ -245,8 +245,16 @@ static VALUE socket_connect (VALUE self_, VALUE addr_)
     return Qnil;
 }
 
+#ifdef HAVE_RUBY_INTERN_H
+static VALUE socket_send_blocking (void* args_)
+{
+    VALUE self_ = RARRAY_PTR(args_)[0];
+    VALUE msg_ = RARRAY_PTR(args_)[1];
+    VALUE flags_ = RARRAY_PTR(args_)[2];
+#else
 static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
 {
+#endif
     assert (DATA_PTR (self_));
 
     Check_Type (msg_, T_STRING);
@@ -278,8 +286,15 @@ static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
     return Qtrue;
 }
 
+#ifdef HAVE_RUBY_INTERN_H
+static VALUE socket_recv_blocking (void* args_)
+{
+    VALUE self_ = RARRAY_PTR(args_)[0];
+    VALUE flags_ = RARRAY_PTR(args_)[1];
+#else
 static VALUE socket_recv (VALUE self_, VALUE flags_)
 {
+#endif
     assert (DATA_PTR (self_));
 
     zmq_msg_t msg;
@@ -306,6 +321,20 @@ static VALUE socket_recv (VALUE self_, VALUE flags_)
     assert (rc == 0);
     return message;
 }
+
+#ifdef HAVE_RUBY_INTERN_H
+static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
+{
+  VALUE args = rb_ary_new3(3, self_, msg_, flags_);
+  return rb_thread_blocking_region(socket_send_blocking, (void*)args, NULL, NULL);
+}
+
+static VALUE socket_recv (VALUE self_, VALUE flags_)
+{
+    VALUE args = rb_ary_new3(2, self_, flags_);
+    return rb_thread_blocking_region(socket_recv_blocking, (void*)args, NULL, NULL);
+}
+#endif
 
 static VALUE socket_close (VALUE self_)
 {
