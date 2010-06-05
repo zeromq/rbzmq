@@ -27,7 +27,7 @@ connect_to = ARGV[0]
 message_size = ARGV[1].to_i
 message_count = ARGV[2].to_i
 			
-ctx = ZMQ::Context.new(1, 1, 0)
+ctx = ZMQ::Context.new(1)
 s = ctx.socket(ZMQ::PUB);
 
 #  Add your socket options here.
