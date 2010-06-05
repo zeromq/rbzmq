@@ -71,6 +71,8 @@ static VALUE context_alloc (VALUE class_)
     return rb_data_object_alloc (class_, NULL, 0, context_free);
 }
 
+#ifdef ZMQ_LWM
+/* ZeroMQ 2.0.6 or earlier */
 static VALUE context_initialize (VALUE self_, VALUE app_threads_,
     VALUE io_threads_, VALUE flags_)
 {
@@ -85,6 +87,24 @@ static VALUE context_initialize (VALUE self_, VALUE app_threads_,
     DATA_PTR (self_) = (void*) ctx;
     return self_;
 }
+#else
+/* ZeroMQ 2.0.7 or later. */
+static VALUE context_initialize (int argc_, VALUE* argv_, VALUE self_)
+{
+    VALUE io_threads;
+    rb_scan_args (argc_, argv_, "01", &io_threads);
+
+    assert (!DATA_PTR (self_));
+    void *ctx = zmq_init (NIL_P (io_threads) ? 1 : NUM2INT (io_threads));
+    if (!ctx) {
+        rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
+        return Qnil;
+    }
+
+    DATA_PTR (self_) = (void*) ctx;
+    return self_;
+}
+#endif
 
 struct poll_state {
     int event;
@@ -581,8 +601,13 @@ extern "C" void Init_zmq ()
     VALUE context_type = rb_define_class_under (zmq_module, "Context",
         rb_cObject);
     rb_define_alloc_func (context_type, context_alloc);
+#ifdef ZMQ_LWM
     rb_define_method (context_type, "initialize",
         (VALUE(*)(...)) context_initialize, 3);
+#else
+    rb_define_method (context_type, "initialize",
+        (VALUE(*)(...)) context_initialize, -1);
+#endif
     rb_define_method (context_type, "socket",
         (VALUE(*)(...)) context_socket, 1);
 
@@ -608,7 +633,7 @@ extern "C" void Init_zmq ()
 
     rb_define_const (zmq_module, "HWM", INT2NUM (ZMQ_HWM));
 #ifdef ZMQ_LWM
-    /* ZMQ_LWM is deprecated. */
+    /* ZMQ_LWM is removed in 2.0.7 */
     rb_define_const (zmq_module, "LWM", INT2NUM (ZMQ_LWM));
 #endif
     rb_define_const (zmq_module, "SWAP", INT2NUM (ZMQ_SWAP));
@@ -633,7 +658,7 @@ extern "C" void Init_zmq ()
     rb_define_const (zmq_module, "NOBLOCK", INT2NUM (ZMQ_NOBLOCK));
 
 #ifdef ZMQ_P2P
-    /* ZMQ_P2P is deprecated. */
+    /* ZMQ_P2P is removed in 2.0.7 */
     rb_define_const (zmq_module, "P2P", INT2NUM (ZMQ_P2P));
 #endif
 #ifdef ZMQ_PAIR
@@ -648,6 +673,4 @@ extern "C" void Init_zmq ()
     rb_define_const (zmq_module, "XREP", INT2NUM (ZMQ_XREP));
     rb_define_const (zmq_module, "UPSTREAM", INT2NUM (ZMQ_UPSTREAM));
     rb_define_const (zmq_module, "DOWNSTREAM", INT2NUM (ZMQ_DOWNSTREAM));
-
-    rb_define_const (zmq_module, "POLL", INT2NUM (ZMQ_POLL));
 }
