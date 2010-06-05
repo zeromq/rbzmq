@@ -58,6 +58,15 @@ typedef unsigned __int64 uint64_t;
 
 VALUE socket_type;
 
+static VALUE module_version (VALUE self_)
+{
+    int major, minor, patch;
+    
+    zmq_version(&major, &minor, &patch);
+    
+    return rb_ary_new3 (3, INT2NUM (major), INT2NUM (minor), INT2NUM (patch));
+}
+
 static void context_free (void *ctx)
 {
     if (ctx) {
@@ -209,7 +218,7 @@ static VALUE zmq_poll_blocking (void* args_)
 }
 
 #endif
-    
+
 static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
 {
     VALUE readset, writeset, errset, timeout;
@@ -592,6 +601,8 @@ static VALUE socket_close (VALUE self_)
 extern "C" void Init_zmq ()
 {
     VALUE zmq_module = rb_define_module ("ZMQ");
+    rb_define_singleton_method (zmq_module, "version",
+        (VALUE(*)(...)) module_version, 0);
     rb_define_singleton_method (zmq_module, "select",
         (VALUE(*)(...)) module_select, -1);
 
