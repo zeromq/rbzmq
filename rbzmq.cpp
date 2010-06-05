@@ -268,9 +268,8 @@ static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
         rc = poll_args.rc;
     }
     else
-#else
-        rc = zmq_poll (items, nitems, timeout_usec);
 #endif
+        rc = zmq_poll (items, nitems, timeout_usec);
     
     if (rc == -1) {
         rb_raise(rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
