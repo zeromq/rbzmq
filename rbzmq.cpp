@@ -198,14 +198,18 @@ static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
     long timeout_usec;
     int rc, nitems, i;
     zmq_pollitem_t *items, *item;
+
+    if (!NIL_P (readset)) Check_Type (readset, T_ARRAY);
+    if (!NIL_P (writeset)) Check_Type (writeset, T_ARRAY);
+    if (!NIL_P (errset)) Check_Type (errset, T_ARRAY);
     
     if (NIL_P (timeout))
         timeout_usec = -1;
     else
-        timeout_usec = NUM2INT (timeout) * 1000000;
+        timeout_usec = (long)(NUM2DBL (timeout) * 1000000);
     
     /* Conservative estimate for nitems before we traverse the lists. */
-    nitems = RARRAY_LEN (readset) +
+    nitems = (NIL_P (readset) ? 0 : RARRAY_LEN (readset)) +
              (NIL_P (writeset) ? 0 : RARRAY_LEN (writeset)) +
              (NIL_P (errset) ? 0 : RARRAY_LEN (errset));
     items = (zmq_pollitem_t*)ruby_xmalloc(sizeof(zmq_pollitem_t) * nitems);
@@ -215,8 +219,10 @@ static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
     ps.items = items;
     ps.io_objects = rb_ary_new ();
 
-    ps.event = ZMQ_POLLIN;
-    rb_iterate(rb_each, readset, (iterfunc)poll_add_item, (VALUE)&ps);
+    if (!NIL_P (readset)) {
+        ps.event = ZMQ_POLLIN;
+        rb_iterate(rb_each, readset, (iterfunc)poll_add_item, (VALUE)&ps);
+    }
 
     if (!NIL_P (writeset)) {
         ps.event = ZMQ_POLLOUT;
