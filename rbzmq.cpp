@@ -503,9 +503,8 @@ static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
         rc = send_args.rc;
     }
     else
-#else
-        rc = zmq_send (DATA_PTR (self_), &msg, flags);
 #endif
+        rc = zmq_send (DATA_PTR (self_), &msg, flags);
     if (rc != 0 && zmq_errno () == EAGAIN) {
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
@@ -555,9 +554,8 @@ static VALUE socket_recv (VALUE self_, VALUE flags_)
         rc = recv_args.rc;
     }
     else
-#else
-        rc = zmq_recv (DATA_PTR (self_), &msg, flags);
 #endif
+        rc = zmq_recv (DATA_PTR (self_), &msg, flags);
     if (rc != 0 && zmq_errno () == EAGAIN) {
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
