@@ -56,6 +56,12 @@ typedef unsigned __int64 uint64_t;
 #include <stdint.h>
 #endif
 
+#define Check_Socket(__socket) \
+    do {\
+        if ((__socket) == NULL)\
+            rb_raise (rb_eIOError, "closed socket");\
+    } while(0)
+
 VALUE socket_type;
 
 static VALUE module_version (VALUE self_)
@@ -335,6 +341,10 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
 {
     int rc = 0;
     VALUE retval;
+    void * s;
+    
+    Data_Get_Struct (self_, void, s);
+    Check_Socket (s);
   
     switch (NUM2INT (option_)) {
     case ZMQ_RCVMORE:
@@ -353,7 +363,7 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
             int64_t optval;
             size_t optvalsize = sizeof(optval);
 
-            rc = zmq_getsockopt (DATA_PTR (self_), NUM2INT (option_), (void *)&optval,
+            rc = zmq_getsockopt (s, NUM2INT (option_), (void *)&optval,
                                  &optvalsize);
 
             if (rc != 0) {
@@ -372,7 +382,7 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
             char identity[255];
             size_t optvalsize = sizeof (identity);
 
-            rc = zmq_getsockopt (DATA_PTR (self_), NUM2INT (option_), (void *)identity,
+            rc = zmq_getsockopt (s, NUM2INT (option_), (void *)identity,
                                  &optvalsize);
 
             if (rc != 0) {
@@ -400,6 +410,10 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
 {
 
     int rc = 0;
+    void * s;
+
+    Data_Get_Struct (self_, void, s);
+    Check_Socket (s);
 
     switch (NUM2INT (option_)) {
     case ZMQ_HWM:
@@ -414,7 +428,7 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
             uint64_t optval = FIX2LONG (optval_);
 
             //  Forward the code to native 0MQ library.
-            rc = zmq_setsockopt (DATA_PTR (self_), NUM2INT (option_),
+            rc = zmq_setsockopt (s, NUM2INT (option_),
                 (void*) &optval, sizeof (optval));
         }
         break;
@@ -424,7 +438,7 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     case ZMQ_UNSUBSCRIBE:
 
         //  Forward the code to native 0MQ library.
-        rc = zmq_setsockopt (DATA_PTR (self_), NUM2INT (option_),
+        rc = zmq_setsockopt (s, NUM2INT (option_),
 	    (void *) StringValueCStr (optval_), RSTRING_LEN (optval_));
         break;
 
@@ -444,9 +458,11 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
 
 static VALUE socket_bind (VALUE self_, VALUE addr_)
 {
-    assert (DATA_PTR (self_));
+    void * s;
+    Data_Get_Struct (self_, void, s);
+    Check_Socket (s);
 
-    int rc = zmq_bind (DATA_PTR (self_), rb_string_value_cstr (&addr_));
+    int rc = zmq_bind (s, rb_string_value_cstr (&addr_));
     if (rc != 0) {
         rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
@@ -457,9 +473,11 @@ static VALUE socket_bind (VALUE self_, VALUE addr_)
 
 static VALUE socket_connect (VALUE self_, VALUE addr_)
 {
-    assert (DATA_PTR (self_));
+    void * s;
+    Data_Get_Struct (self_, void, s);
+    Check_Socket (s);
 
-    int rc = zmq_connect (DATA_PTR (self_), rb_string_value_cstr (&addr_));
+    int rc = zmq_connect (s, rb_string_value_cstr (&addr_));
     if (rc != 0) {
         rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
@@ -488,7 +506,9 @@ static VALUE zmq_send_blocking (void* args_)
 
 static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
 {
-    assert (DATA_PTR (self_));
+    void * s;
+    Data_Get_Struct (self_, void, s);
+    Check_Socket (s);
 
     Check_Type (msg_, T_STRING);
 
@@ -505,7 +525,7 @@ static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
 #ifdef HAVE_RUBY_INTERN_H
     if (!(flags & ZMQ_NOBLOCK)) {
         struct zmq_send_recv_args send_args;
-        send_args.socket = DATA_PTR (self_);
+        send_args.socket = s;
         send_args.msg = &msg;
         send_args.flags = flags;
         rb_thread_blocking_region (zmq_send_blocking, (void*) &send_args, NULL, NULL);
@@ -513,7 +533,7 @@ static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
     }
     else
 #endif
-        rc = zmq_send (DATA_PTR (self_), &msg, flags);
+        rc = zmq_send (s, &msg, flags);
     if (rc != 0 && zmq_errno () == EAGAIN) {
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
@@ -545,7 +565,9 @@ static VALUE zmq_recv_blocking (void* args_)
 
 static VALUE socket_recv (VALUE self_, VALUE flags_)
 {
-    assert (DATA_PTR (self_));
+    void * s;
+    Data_Get_Struct (self_, void, s);
+    Check_Socket (s);
 
     int flags = NUM2INT (flags_);
 
@@ -556,7 +578,7 @@ static VALUE socket_recv (VALUE self_, VALUE flags_)
 #ifdef HAVE_RUBY_INTERN_H
     if (!(flags & ZMQ_NOBLOCK)) {
         struct zmq_send_recv_args recv_args;
-        recv_args.socket = DATA_PTR (self_);
+        recv_args.socket = s;
         recv_args.msg = &msg;
         recv_args.flags = flags;
         rb_thread_blocking_region (zmq_recv_blocking, (void*) &recv_args, NULL, NULL);
@@ -564,7 +586,7 @@ static VALUE socket_recv (VALUE self_, VALUE flags_)
     }
     else
 #endif
-        rc = zmq_recv (DATA_PTR (self_), &msg, flags);
+        rc = zmq_recv (s, &msg, flags);
     if (rc != 0 && zmq_errno () == EAGAIN) {
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
@@ -588,13 +610,16 @@ static VALUE socket_recv (VALUE self_, VALUE flags_)
 static VALUE socket_close (VALUE self_)
 {
     void * s = NULL;
-    Data_Get_Struct(self_, void, s);
-    int rc = zmq_close(s);
-    if (rc != 0) {
-        rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
-        return Qnil;
-    }
+    Data_Get_Struct (self_, void, s);
+    if (s != NULL) {
+        int rc = zmq_close (s);
+        if (rc != 0) {
+            rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
+            return Qnil;
+        }
 
+        DATA_PTR (self_) = NULL;
+    }
     return Qnil;
 }
 
