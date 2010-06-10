@@ -121,6 +121,21 @@ static VALUE context_initialize (int argc_, VALUE* argv_, VALUE self_)
 }
 #endif
 
+static VALUE context_close (VALUE self_)
+{
+    void * ctx = NULL;
+    Data_Get_Struct (self_, void, ctx);
+    
+    if (ctx != NULL) {
+        int rc = zmq_term (ctx);
+        assert (rc == 0);
+
+        DATA_PTR (self_) = NULL;
+    }
+
+    return Qnil;
+}
+
 struct poll_state {
     int event;
     int nitems;
@@ -643,6 +658,8 @@ extern "C" void Init_zmq ()
 #endif
     rb_define_method (context_type, "socket",
         (VALUE(*)(...)) context_socket, 1);
+    rb_define_method (context_type, "close",
+        (VALUE(*)(...)) context_close, 0);
 
     socket_type = rb_define_class_under (zmq_module, "Socket", rb_cObject);
     rb_undef_alloc_func(socket_type);
