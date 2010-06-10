@@ -129,23 +129,23 @@ static VALUE poll_add_item(VALUE io_, void *ps_) {
 
     long i;
     
-    for (i = 0; i < RARRAY_LEN(state->io_objects); i++) {
-        if (RARRAY_PTR(state->io_objects)[i] == io_) {
+    for (i = 0; i < RARRAY_LEN (state->io_objects); i++) {
+        if (RARRAY_PTR (state->io_objects)[i] == io_) {
 #ifdef HAVE_RUBY_IO_H
             state->items[i].events |= state->event;
             return Qnil;
 #else
-            if (CLASS_OF(io_) == socket_type) {
+            if (CLASS_OF (io_) == socket_type) {
                 state->items[i].events |= state->event;
                 return Qnil;
             }
 
             OpenFile *fptr;
-            GetOpenFile(io_, fptr);
+            GetOpenFile (io_, fptr);
             
             if (state->event == ZMQ_POLLOUT &&
-                GetWriteFile(fptr) != NULL &&
-                fileno(GetWriteFile(fptr)) != state->items[i].fd) {
+                GetWriteFile (fptr) != NULL &&
+                fileno (GetWriteFile (fptr)) != state->items[i].fd) {
                 break;
             }
             else {
@@ -157,14 +157,14 @@ static VALUE poll_add_item(VALUE io_, void *ps_) {
     }
     
     /* Not found in array.  Add a new poll item. */
-    rb_ary_push(state->io_objects, io_);
+    rb_ary_push (state->io_objects, io_);
     
     zmq_pollitem_t *item = &state->items[state->nitems];
     state->nitems++;
 
     item->events = state->event;
 
-    if (CLASS_OF(io_) == socket_type) {
+    if (CLASS_OF (io_) == socket_type) {
         item->socket = DATA_PTR (io_);
         item->fd = -1;
     }
@@ -174,24 +174,24 @@ static VALUE poll_add_item(VALUE io_, void *ps_) {
 #ifdef HAVE_RUBY_IO_H
         rb_io_t *fptr;
 
-        GetOpenFile(io_, fptr);
-        item->fd = fileno(rb_io_stdio_file(fptr));
+        GetOpenFile (io_, fptr);
+        item->fd = fileno (rb_io_stdio_file (fptr));
 #else
         OpenFile *fptr;
         
-        GetOpenFile(io_, fptr);
+        GetOpenFile (io_, fptr);
         
-        if (state->event == ZMQ_POLLIN && GetReadFile(fptr) != NULL) {
-            item->fd = fileno(GetReadFile(fptr));
+        if (state->event == ZMQ_POLLIN && GetReadFile (fptr) != NULL) {
+            item->fd = fileno (GetReadFile (fptr));
         }
-        else if (state->event == ZMQ_POLLOUT && GetWriteFile(fptr) != NULL) {
-            item->fd = fileno(GetWriteFile(fptr));
+        else if (state->event == ZMQ_POLLOUT && GetWriteFile (fptr) != NULL) {
+            item->fd = fileno (GetWriteFile (fptr));
         }
         else if (state->event == ZMQ_POLLERR) {
             if (GetReadFile(fptr) != NULL)
-                item->fd = fileno(GetReadFile(fptr));
+                item->fd = fileno (GetReadFile (fptr));
             else
-                item->fd = fileno(GetWriteFile(fptr));
+                item->fd = fileno (GetWriteFile (fptr));
         }
 #endif
     }
@@ -212,7 +212,7 @@ static VALUE zmq_poll_blocking (void* args_)
 {
     struct zmq_poll_args *poll_args = (struct zmq_poll_args *)args_;
     
-    poll_args->rc = zmq_poll(poll_args->items, poll_args->nitems, poll_args->timeout_usec);
+    poll_args->rc = zmq_poll (poll_args->items, poll_args->nitems, poll_args->timeout_usec);
     
     return Qnil;
 }
@@ -304,7 +304,7 @@ static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
         }
     }
     
-    ruby_xfree(items);
+    ruby_xfree (items);
     
     return rb_ary_new3 (3, read_active, write_active, err_active);
 }
@@ -320,10 +320,10 @@ static void socket_free (void *s)
 static VALUE context_socket (VALUE self_, VALUE type_)
 {
     void * c = NULL;
-    Data_Get_Struct(self_, void, c);
-    void * s = zmq_socket(c, NUM2INT (type_));
+    Data_Get_Struct (self_, void, c);
+    void * s = zmq_socket (c, NUM2INT (type_));
     if (!s) {
-        rb_raise(rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
+        rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
     }
 
@@ -364,7 +364,7 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
             if (NUM2INT (option_) == ZMQ_RCVMORE)
                 retval = optval ? Qtrue : Qfalse;
             else
-                retval = INT2NUM(optval);
+                retval = INT2NUM (optval);
         }
         break;
     case ZMQ_IDENTITY:
