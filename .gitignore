@@ -1,5 +1,6 @@
 /Makefile
 /mkmf.log
+/doc
 *.o
 *.bundle
 *.so
