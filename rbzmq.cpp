@@ -86,24 +86,6 @@ static VALUE context_alloc (VALUE class_)
     return rb_data_object_alloc (class_, NULL, 0, context_free);
 }
 
-#ifdef ZMQ_LWM
-/* ZeroMQ 2.0.6 or earlier */
-static VALUE context_initialize (VALUE self_, VALUE app_threads_,
-    VALUE io_threads_, VALUE flags_)
-{
-    assert (!DATA_PTR (self_));
-    void *ctx = zmq_init (NUM2INT (app_threads_), NUM2INT (io_threads_),
-        NUM2INT (flags_));
-    if (!ctx) {
-        rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
-        return Qnil;
-    }
-
-    DATA_PTR (self_) = (void*) ctx;
-    return self_;
-}
-#else
-/* ZeroMQ 2.0.7 or later. */
 static VALUE context_initialize (int argc_, VALUE* argv_, VALUE self_)
 {
     VALUE io_threads;
@@ -119,7 +101,6 @@ static VALUE context_initialize (int argc_, VALUE* argv_, VALUE self_)
     DATA_PTR (self_) = (void*) ctx;
     return self_;
 }
-#endif
 
 static VALUE context_close (VALUE self_)
 {
@@ -351,7 +332,6 @@ static VALUE context_socket (VALUE self_, VALUE type_)
     return Data_Wrap_Struct(socket_type, 0, socket_free, s);
 }
 
-#ifdef ZMQ_RCVMORE
 static VALUE socket_getsockopt (VALUE self_, VALUE option_)
 {
     int rc = 0;
@@ -364,9 +344,6 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
     switch (NUM2INT (option_)) {
     case ZMQ_RCVMORE:
     case ZMQ_HWM:
-#ifdef ZMQ_LWM
-    case ZMQ_LWM:
-#endif
     case ZMQ_SWAP:
     case ZMQ_AFFINITY:
     case ZMQ_RATE:
@@ -418,7 +395,6 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
   
     return retval;
 }
-#endif
 
 static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     VALUE optval_)
@@ -649,13 +625,8 @@ extern "C" void Init_zmq ()
     VALUE context_type = rb_define_class_under (zmq_module, "Context",
         rb_cObject);
     rb_define_alloc_func (context_type, context_alloc);
-#ifdef ZMQ_LWM
-    rb_define_method (context_type, "initialize",
-        (VALUE(*)(...)) context_initialize, 3);
-#else
     rb_define_method (context_type, "initialize",
         (VALUE(*)(...)) context_initialize, -1);
-#endif
     rb_define_method (context_type, "socket",
         (VALUE(*)(...)) context_socket, 1);
     rb_define_method (context_type, "close",
@@ -663,11 +634,8 @@ extern "C" void Init_zmq ()
 
     socket_type = rb_define_class_under (zmq_module, "Socket", rb_cObject);
     rb_undef_alloc_func(socket_type);
-#ifdef ZMQ_RCVMORE
-    /* zeromq 2.0.7 and higher */
     rb_define_method (socket_type, "getsockopt",
         (VALUE(*)(...)) socket_getsockopt, 1);
-#endif
     rb_define_method (socket_type, "setsockopt",
         (VALUE(*)(...)) socket_setsockopt, 2);
     rb_define_method (socket_type, "bind",
@@ -682,10 +650,6 @@ extern "C" void Init_zmq ()
         (VALUE(*)(...)) socket_close, 0);
 
     rb_define_const (zmq_module, "HWM", INT2NUM (ZMQ_HWM));
-#ifdef ZMQ_LWM
-    /* ZMQ_LWM is removed in 2.0.7 */
-    rb_define_const (zmq_module, "LWM", INT2NUM (ZMQ_LWM));
-#endif
     rb_define_const (zmq_module, "SWAP", INT2NUM (ZMQ_SWAP));
     rb_define_const (zmq_module, "AFFINITY", INT2NUM (ZMQ_AFFINITY));
     rb_define_const (zmq_module, "IDENTITY", INT2NUM (ZMQ_IDENTITY));
@@ -696,25 +660,12 @@ extern "C" void Init_zmq ()
     rb_define_const (zmq_module, "MCAST_LOOP", INT2NUM (ZMQ_MCAST_LOOP));
     rb_define_const (zmq_module, "SNDBUF", INT2NUM (ZMQ_SNDBUF));
     rb_define_const (zmq_module, "RCVBUF", INT2NUM (ZMQ_RCVBUF));
-#ifdef ZMQ_SNDMORE
-    /* zeromq 2.0.7 and higher */
     rb_define_const (zmq_module, "SNDMORE", INT2NUM (ZMQ_SNDMORE));
-#endif
-#ifdef ZMQ_RCVMORE
-    /* zeromq 2.0.7 and higher */
     rb_define_const (zmq_module, "RCVMORE", INT2NUM (ZMQ_RCVMORE));
-#endif
 
     rb_define_const (zmq_module, "NOBLOCK", INT2NUM (ZMQ_NOBLOCK));
 
-#ifdef ZMQ_P2P
-    /* ZMQ_P2P is removed in 2.0.7 */
-    rb_define_const (zmq_module, "P2P", INT2NUM (ZMQ_P2P));
-#endif
-#ifdef ZMQ_PAIR
-    /* zeromq 2.0.7 and higher */
     rb_define_const (zmq_module, "PAIR", INT2NUM (ZMQ_PAIR));
-#endif
     rb_define_const (zmq_module, "SUB", INT2NUM (ZMQ_SUB));
     rb_define_const (zmq_module, "PUB", INT2NUM (ZMQ_PUB));
     rb_define_const (zmq_module, "REQ", INT2NUM (ZMQ_REQ));
