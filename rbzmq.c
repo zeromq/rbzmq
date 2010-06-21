@@ -1169,7 +1169,7 @@ static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
     }
     memcpy (zmq_msg_data (&msg), RSTRING_PTR (msg_), RSTRING_LEN (msg_));
 
-#ifdef HAVE_RUBY_INTERN_H
+#if defined(HAVE_RUBY_INTERN_H)
     if (!(flags & ZMQ_NOBLOCK)) {
         struct zmq_send_recv_args send_args;
         send_args.socket = s;
@@ -1178,9 +1178,38 @@ static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
         rb_thread_blocking_region (zmq_send_blocking, (void*) &send_args, NULL, NULL);
         rc = send_args.rc;
     }
-    else
-#endif
+    else {
         rc = zmq_send (s, &msg, flags);
+    }
+#else
+#  if defined(ZMQ_FD)
+    if (!(flags & ZMQ_NOBLOCK) && !rb_thread_alone()) {
+        int fd;
+        size_t optsiz = sizeof (fd);
+        
+        rc = zmq_getsockopt (s, ZMQ_FD, &fd, &optsiz);
+        assert (rc == 0);
+        
+        for (;;) {
+            rc = zmq_send (s, &msg, flags | ZMQ_NOBLOCK);
+            if (rc == 0 || zmq_errno () != EAGAIN)
+                break;
+            
+            if (rb_thread_alone()) {
+                rc = zmq_send (s, &msg, flags);
+                break;
+            }
+
+            rb_thread_wait_fd(fd);
+        }
+    }
+    else {
+        rc = zmq_send (s, &msg, flags);
+    }
+#  else
+    rc = zmq_send (s, &msg, flags);
+#  endif
+#endif
     if (rc != 0 && zmq_errno () == EAGAIN) {
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
@@ -1247,7 +1276,7 @@ static VALUE socket_recv (VALUE self_, VALUE flags_)
     int rc = zmq_msg_init (&msg);
     assert (rc == 0);
 
-#ifdef HAVE_RUBY_INTERN_H
+#if defined(HAVE_RUBY_INTERN_H)
     if (!(flags & ZMQ_NOBLOCK)) {
         struct zmq_send_recv_args recv_args;
         recv_args.socket = s;
@@ -1256,9 +1285,39 @@ static VALUE socket_recv (VALUE self_, VALUE flags_)
         rb_thread_blocking_region (zmq_recv_blocking, (void*) &recv_args, NULL, NULL);
         rc = recv_args.rc;
     }
-    else
-#endif
+    else {
         rc = zmq_recv (s, &msg, flags);
+    }
+#else
+#  if defined(ZMQ_FD)
+    if (!(flags & ZMQ_NOBLOCK) && !rb_thread_alone()) {
+        int fd;
+        size_t optsiz = sizeof (fd);
+        
+        rc = zmq_getsockopt (s, ZMQ_FD, &fd, &optsiz);
+        assert (rc == 0);
+        
+        for (;;) {
+            rc = zmq_recv (s, &msg, flags | ZMQ_NOBLOCK);
+            if (rc == 0 || zmq_errno () != EAGAIN)
+                break;
+            
+            if (rb_thread_alone()) {
+                rc = zmq_recv (s, &msg, flags);
+                break;
+            }
+
+            rb_thread_wait_fd(fd);
+        }
+    }
+    else {
+        rc = zmq_recv (s, &msg, flags);
+    }
+#  else
+    rc = zmq_recv (s, &msg, flags);
+#  endif
+#endif
+
     if (rc != 0 && zmq_errno () == EAGAIN) {
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
