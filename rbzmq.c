@@ -1151,15 +1151,19 @@ static VALUE zmq_send_blocking (void* args_)
  *
  * This function returns _true_ if successful, _false_ if not.
  */
-static VALUE socket_send (VALUE self_, VALUE msg_, VALUE flags_)
+static VALUE socket_send (int argc_, VALUE* argv_, VALUE self_)
 {
+    VALUE msg_, flags_;
+    
+    rb_scan_args (argc_, argv_, "11", &msg_, &flags_);
+
     void * s;
     Data_Get_Struct (self_, void, s);
     Check_Socket (s);
 
     Check_Type (msg_, T_STRING);
 
-    int flags = NUM2INT (flags_);
+    int flags = NIL_P (flags_) ? 0 : NUM2INT (flags_);
 
     zmq_msg_t msg;
     int rc = zmq_msg_init_size (&msg, RSTRING_LEN (msg_));
@@ -1235,13 +1239,17 @@ static VALUE zmq_recv_blocking (void* args_)
  * ZMQ::RCVMORE shall report a value of false. Otherwise, ZMQ::RCVMORE shall
  * report a value of true, indicating that more message parts are to follow.
  */
-static VALUE socket_recv (VALUE self_, VALUE flags_)
+static VALUE socket_recv (int argc_, VALUE* argv_, VALUE self_)
 {
+    VALUE flags_;
+    
+    rb_scan_args (argc_, argv_, "01", &flags_);
+
     void * s;
     Data_Get_Struct (self_, void, s);
     Check_Socket (s);
 
-    int flags = NUM2INT (flags_);
+    int flags = NIL_P (flags_) ? 0 : NUM2INT (flags_);
 
     zmq_msg_t msg;
     int rc = zmq_msg_init (&msg);
@@ -1325,8 +1333,8 @@ void Init_zmq ()
     rb_define_method (socket_type, "setsockopt", socket_setsockopt, 2);
     rb_define_method (socket_type, "bind", socket_bind, 1);
     rb_define_method (socket_type, "connect", socket_connect, 1);
-    rb_define_method (socket_type, "send", socket_send, 2);
-    rb_define_method (socket_type, "recv", socket_recv, 1);
+    rb_define_method (socket_type, "send", socket_send, -1);
+    rb_define_method (socket_type, "recv", socket_recv, -1);
     rb_define_method (socket_type, "close", socket_close, 0);
 
     rb_define_const (zmq_module, "HWM", INT2NUM (ZMQ_HWM));
