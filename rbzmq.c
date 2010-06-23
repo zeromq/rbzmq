@@ -1122,7 +1122,7 @@ static VALUE zmq_send_blocking (void* args_)
 
 /*
  * call-seq:
- *   socket.send(message, flags) -> true | false
+ *   socket.send(message, flags=0) -> true | false
  *
  * Queue the message referenced by the _msg_ argument to be send to the
  * _socket_.  The _flags_ argument is a combination of the flags defined
@@ -1216,7 +1216,7 @@ static VALUE zmq_recv_blocking (void* args_)
 
 /*
  * call-seq:
- *   socket.recv(flags) -> message | nil
+ *   socket.recv(flags=0) -> message | nil
  *
  * Receives a message from the _socket_.  If there are no messages available
  * on the _socket_, the recv() function shall block until the request can be
