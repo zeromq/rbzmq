@@ -1,12 +1,12 @@
 Gem::Specification.new do |s|
-  s.name = 'zmq2'
+  s.name = 'zmq'
   s.version = '2.0.7'
-  s.date = '2010-06-17'
+  s.date = '2010-06-28'
   s.authors = ['Martin Sustrik', 'Brian Buchanan']
   s.email = ['sustrik@250bpm.com', 'bwb@holo.org']
-  s.description = 'This gem provides bindings for the zeromq library (2.x version series)'
+  s.description = 'This gem provides a Ruby API for the ZeroMQ messaging library.'
   s.homepage = 'http://www.zeromq.org/bindings:ruby'
-  s.summary = 'Ruby API for ZeroMQ 2.x'
+  s.summary = 'Ruby API for ZeroMQ'
   s.extensions = 'extconf.rb'
   s.files = Dir['Makefile'] + Dir['*.c']
   s.has_rdoc = true
