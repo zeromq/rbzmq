@@ -1,0 +1,25 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>version (ZMQ)</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <link rel="stylesheet" href="../.././rdoc-style.css" type="text/css" media="screen" />
+</head>
+<body class="standalone-code">
+  <pre>/*
+ * call-seq:
+ *   ZMQ.version() -&gt; [major, minor, patch]
+ *
+ * Returns the version of the zeromq library.
+ */
+static VALUE module_version (VALUE self_)
+{
+    int major, minor, patch;
+    
+    zmq_version(&amp;major, &amp;minor, &amp;patch);
+    
+    return rb_ary_new3 (3, INT2NUM (major), INT2NUM (minor), INT2NUM (patch));
+}</pre>
+</body>
+</html>

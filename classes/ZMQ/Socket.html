@@ -1,0 +1,1296 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Class: ZMQ::Socket [zmq-2.0.7 Documentation]</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Script-Type" content="text/javascript" />
+  <link rel="stylesheet" href="../.././rdoc-style.css" type="text/css" media="screen" />
+  <script type="text/javascript">
+  // <![CDATA[
+
+  function popupCode( url ) {
+    window.open(url, "Code", "resizable=yes,scrollbars=yes,toolbar=no,status=no,height=150,width=400")
+  }
+
+  function toggleCode( id ) {
+    if ( document.getElementById )
+      elem = document.getElementById( id );
+    else if ( document.all )
+      elem = eval( "document.all." + id );
+    else
+      return false;
+
+    elemStyle = elem.style;
+
+    if ( elemStyle.display != "block" ) {
+      elemStyle.display = "block"
+    } else {
+      elemStyle.display = "none"
+    }
+
+    return true;
+  }
+
+  // Make codeblocks hidden by default
+  document.writeln( "<style type=\"text/css\">div.method-source-code { display: none }<\/style>" )
+
+  // ]]>
+  </script>
+
+</head>
+<body>
+
+
+    <div id="classHeader">
+        <table class="header-table">
+        <tr class="top-aligned-row">
+          <td><strong>Class</strong></td>
+          <td class="class-name-in-header">ZMQ::Socket</td>
+        </tr>
+        <tr class="top-aligned-row">
+            <td><strong>In:</strong></td>
+            <td>
+
+
+                <a href="../../files/rbzmq_c.html">
+
+                rbzmq.c
+
+                </a>
+
+
+        <br />
+
+            </td>
+        </tr>
+
+
+        <tr class="top-aligned-row">
+            <td><strong>Parent:</strong></td>
+            <td>
+
+                Object
+
+            </td>
+        </tr>
+
+        </table>
+    </div>
+  <!-- banner header -->
+
+  <div id="bodyContent">
+
+  <div id="contextContent">
+
+    <div id="description">
+      <p>
+ZeroMQ message socket.
+</p>
+<h1>Description</h1>
+<h2>Key differences to conventional sockets</h2>
+<p>
+Generally speaking, conventional sockets present a <em>synchronous</em>
+interface to either connection-oriented reliable byte streams
+(SOCK_STREAM), or connection-less unreliable datagrams (SOCK_DGRAM). In
+comparison, 0MQ sockets present an abstraction of an asynchronous
+<em>message queue</em>, with the exact queueing semantics depending on the
+socket type in use. Where conventional sockets transfer streams of bytes or
+discrete datagrams, 0MQ sockets transfer discrete <em>messages</em>.
+</p>
+<p>
+0MQ sockets being <em>asynchronous</em> means that the timings of the
+physical connection setup and teardown, reconnect and effective delivery
+are transparent to the user and organized by 0MQ itself. Further, messages
+may be <em>queued</em> in the event that a peer is unavailable to receive
+them.
+</p>
+<p>
+Conventional sockets allow only strict one-to-one (two peers), many-to-one
+(many clients, one server), or in some cases one-to-many (multicast)
+relationships. With the exception of ZMQ::PAIR, 0MQ sockets may be
+connected <b>to multiple endpoints</b> using connect(), while
+simultaneously accepting incoming connections <b>from multiple
+endpoints</b> bound to the socket using bind(), thus allowing many-to-many
+relationships.
+</p>
+<h2><a href="Socket.html">Socket</a> Types</h2>
+<p>
+The following sections present the socket types defined by 0MQ, grouped by
+the general <em>messaging pattern</em> which is built from related socket
+types.
+</p>
+<h1>Request-reply pattern</h1>
+<p>
+The request-reply pattern is used for sending requests from a
+<em>client</em> to one or more instances of a <em>service</em>, and
+receiving subsequent replies to each request sent.
+</p>
+<h2>ZMQ::REQ</h2>
+<p>
+A socket of type ZMQ::REQ is used by a <em>client</em> to send requests to
+and receive replies from a <em>service</em>. This socket type allows only
+an alternating sequence of send(request) and subsequent recv(reply) calls.
+Each request sent is load-balanced among all <em>services</em>, and each
+reply received is matched with the last issued request.
+</p>
+<p>
+When a ZMQ::REQ socket enters an exceptional state due to having reached
+the high water mark for all <em>services</em>, or if there are no
+<em>services</em> at all, then any send() operations on the socket shall
+block until the exceptional state ends or at least one <em>service</em>
+becomes available for sending; messages are not discarded.
+</p>
+<h3>Summary of ZMQ::REQ characteristics</h3>
+<dl>
+<dt>Compatible peer sockets</dt><dd>ZMQ::REP
+
+</dd>
+<dt>Direction</dt><dd>Bidirectional
+
+</dd>
+<dt>Send/receive pattern</dt><dd>Send, Receive, Send, Receive, &#8230;
+
+</dd>
+<dt>Outgoing routing strategy</dt><dd>Load-balanced
+
+</dd>
+<dt>Incoming routing strategy</dt><dd>Last peer
+
+</dd>
+<dt>ZMQ::HWM option action</dt><dd>Block
+
+</dd>
+</dl>
+<h2>ZMQ::REP</h2>
+<p>
+A socket of type ZMQ::REP is used by a <em>service</em> to receive requests
+from and send replies to a <em>client</em>. This socket type allows only an
+alternating sequence of recv(request) and subsequent send(reply) calls.
+Each request received is fair-queued from among all <em>clients</em>, and
+each reply sent is routed to the <em>client</em> that issued the last
+request.
+</p>
+<p>
+When a ZMQ::REP socket enters an exceptional state due to having reached
+the high water mark for a <em>client</em>, then any replies sent to the
+<em>client</em> in question shall be dropped until the exceptional state
+ends.
+</p>
+<h3>Summary of ZMQ::REP characteristics</h3>
+<dl>
+<dt>Compatible peer sockets</dt><dd>ZMQ::REQ
+
+</dd>
+<dt>Direction</dt><dd>Bidirectional
+
+</dd>
+<dt>Send/receive pattern</dt><dd>Receive, Send, Receive, Send, &#8230;
+
+</dd>
+<dt>Incoming routing strategy</dt><dd>Fair-queued
+
+</dd>
+<dt>Outgoing routing stratagy</dt><dd>Last peer
+
+</dd>
+<dt>ZMQ::HWM option action</dt><dd>Drop
+
+</dd>
+</dl>
+<h1>Publish-subscribe pattern</h1>
+<p>
+The publish-subscribe pattern is used for one-to-many distribution of data
+from a single <em>publisher</em> to multiple <em>subscribers</em> in a
+fanout fashion.
+</p>
+<h2>ZMQ::PUB</h2>
+<p>
+A socket of type ZMQ::PUB is used by a publisher to distribute data.
+Messages sent are distributed in a fanout fashion to all connected peers.
+The recv() function is not implemented for this socket type.
+</p>
+<p>
+When a ZMQ::PUB socket enters an exceptional state due to having reached
+the high water mark for a <em>subscriber</em>, then any messages that would
+be sent to the subscriber in question shall instead be dropped until the
+exceptional state ends.
+</p>
+<h3>Summary of ZMQ::PUB characteristics</h3>
+<dl>
+<dt>Compatible peer sockets</dt><dd>ZMQ::SUB
+
+</dd>
+<dt>Direction</dt><dd>Unidirectional
+
+</dd>
+<dt>Send/receive pattern</dt><dd>Send only
+
+</dd>
+<dt>Incoming routing strategy</dt><dd>N/A
+
+</dd>
+<dt>Outgoing routing strategy</dt><dd>Fanout
+
+</dd>
+<dt>ZMQ::HWM option action</dt><dd>Drop
+
+</dd>
+</dl>
+<h2>ZMQ::SUB</h2>
+<p>
+A socket of type ZMQ::SUB is used by a <em>subscriber</em> to subscribe to
+data distributed by a <em>publisher</em>. Initially a ZMQ::SUB socket is
+not subscribed to any messages, use the ZMQ::SUBSCRIBE option of
+setsockopt() to specify which messages to subscribe to. The send() function
+is not implemented for this socket type.
+</p>
+<h3>Summary of ZMQ::SUB characteristics</h3>
+<dl>
+<dt>Compatible peer sockets</dt><dd>ZMQ::PUB
+
+</dd>
+<dt>Direction</dt><dd>Unidirectional
+
+</dd>
+<dt>Send/receive pattern</dt><dd>Receive only
+
+</dd>
+<dt>Incoming routing strategy</dt><dd>Fair-queued
+
+</dd>
+<dt>Outgoing routing strategy</dt><dd>N/A
+
+</dd>
+<dt>ZMQ::HWM option action</dt><dd>N/A
+
+</dd>
+</dl>
+<h1>Pipeline pattern</h1>
+<p>
+The pipeline pattern is used for distributing data to <em>nodes</em>
+arranged in a pipeline. Data always flows down the pipeline, and each stage
+of the pipeline is connected to at least one <em>node</em>. When a pipeline
+stage is connected to multiple <em>nodes</em> data is load-balanced among
+all connected <em>nodes</em>.
+</p>
+<h2>ZMQ::DOWNSTREAM</h2>
+<p>
+A socket of type ZMQ::DOWNSTREAM is used by a pipeline node to send
+messages to downstream pipeline nodes. Messages are load-balanced to all
+connected downstream nodes. The ZMQ::recv() function is not implemented for
+this socket type.
+</p>
+<p>
+When a ZMQ::DOWNSTREAM socket enters an exceptional state due to having
+reached the high water mark for all downstream <em>nodes</em>, or if there
+are no downstream <em>nodes</em> at all, then any send() operations on the
+socket shall block until the exceptional state ends or at least one
+downstream <em>node</em> becomes available for sending; messages are not
+discarded.
+</p>
+<h3>Summary of ZMQ::DOWNSTREAM characteristics</h3>
+<dl>
+<dt>Compatible peer sockets</dt><dd>ZMQ::UPSTREAM
+
+</dd>
+<dt>Direction</dt><dd>Unidirectional
+
+</dd>
+<dt>Send/receive pattern</dt><dd>Send only
+
+</dd>
+<dt>Incoming routing strategy</dt><dd>N/A
+
+</dd>
+<dt>Outgoing routing strategy</dt><dd>Load-balanced
+
+</dd>
+<dt>ZMQ::HWM option action</dt><dd>Block
+
+</dd>
+</dl>
+<h2>ZMQ::UPSTREAM</h2>
+<p>
+A socket of type ZMQ::UPSTREAM is used by a pipeline <em>node</em> to
+receive messages from upstream pipeline <em>nodes</em>. Messages are
+fair-queued from among all connected upstream nodes. The send() function is
+not implemented for this socket type.
+</p>
+<h3>Summary of ZMQ::UPSTREAM characteristics</h3>
+<dl>
+<dt>Compatible peer sockets</dt><dd>ZMQ::DOWNSTREAM
+
+</dd>
+<dt>Direction</dt><dd>Unidirectional
+
+</dd>
+<dt>Send/receive pattern</dt><dd>Receive only
+
+</dd>
+<dt>Incoming routing strategy</dt><dd>Fair-queued
+
+</dd>
+<dt>Outgoing routing strategy</dt><dd>N/A
+
+</dd>
+<dt>ZMQ::HWM option action</dt><dd>N/A
+
+</dd>
+</dl>
+<h1>Exclusive pair pattern</h1>
+<p>
+The exclusive pair is an advanced pattern used for communicating
+exclusively between two peers.
+</p>
+<h2>ZMQ::PAIR</h2>
+<p>
+A socket of type ZMQ::PAIR can only be connected to a single peer at any
+one time. No message routing or filtering is performed on messages sent
+over a ZMQ::PAIR socket.
+</p>
+<p>
+When a ZMQ::PAIR socket enters an exceptional state due to having reached
+the high water mark for the connected peer, or if no peer is connected,
+then any send() operations on the socket shall block until the peer becomes
+available for sending; messages are not discarded.
+</p>
+<p>
+<b>NOTE</b> ZMQ_PAIR sockets are experimental, and are currently missing
+several features such as auto-reconnection.
+</p>
+<h3>Summary of ZMQ::PAIR characteristics</h3>
+<dl>
+<dt>Compatible peer sockets</dt><dd>ZMQ::PAIR
+
+</dd>
+<dt>Direction</dt><dd>Bidirectional
+
+</dd>
+<dt>Send/receive pattern</dt><dd>Unrestricted
+
+</dd>
+<dt>Incoming routing strategy</dt><dd>N/A
+
+</dd>
+<dt>Outcoming routing strategy</dt><dd>N/A
+
+</dd>
+<dt>ZMQ::HWM option action</dt><dd>Block
+
+</dd>
+</dl>
+
+    </div>
+
+   </div>
+
+
+    <div id="method-list">
+      <h3 class="section-bar">Methods</h3>
+
+      <div class="name-list">
+
+        <a href="#M000008">bind</a>&nbsp;&nbsp;
+
+        <a href="#M000012">close</a>&nbsp;&nbsp;
+
+        <a href="#M000009">connect</a>&nbsp;&nbsp;
+
+        <a href="#M000006">getsockopt</a>&nbsp;&nbsp;
+
+        <a href="#M000011">recv</a>&nbsp;&nbsp;
+
+        <a href="#M000010">send</a>&nbsp;&nbsp;
+
+        <a href="#M000007">setsockopt</a>&nbsp;&nbsp;
+
+      </div>
+    </div>
+
+  </div>
+
+    <!-- if includes -->
+
+    <div id="section">
+
+
+
+
+    <!-- if method_list -->
+
+    <div id="methods">
+
+      <h3 class="section-bar">Public Instance methods</h3>
+
+
+      <div id="method-M000008" class="method-detail">
+        <a name="M000008"></a>
+
+        <div class="method-heading">
+
+          <a href="Socket.src/M000008.html" target="Code" class="method-signature"
+            onclick="popupCode('Socket.src/M000008.html');return false;">
+
+          <span class="method-name">socket.bind(endpoint) &rarr; nil<br />
+</span>
+
+          </a>
+
+        </div>
+
+        <div class="method-description">
+
+          <p>
+Creates an endpoint for accepting connections and binds it to the socket.
+</p>
+<p>
+The <em>endpoint</em> argument is a string consisting of two parts as
+follows: _transport://address_. The <em>transport</em> part specifies the
+underlying transport protocol to use. The meaning of the <em>address</em>
+part is specific to the underlying transport protocol selected.
+</p>
+<p>
+The following transports are defined:
+</p>
+<dl>
+<dt><em>inproc</em></dt><dd>local in-process (inter-thread) communication transport
+
+</dd>
+<dt><em>ipc</em></dt><dd>local inter-process communication transport
+
+</dd>
+<dt><em>tcp</em></dt><dd>unicast transport using TCP
+
+</dd>
+<dt><em>pgm</em>, <em>epgm</em></dt><dd>reliable multicast transport using PGM
+
+</dd>
+</dl>
+<p>
+With the exception of ZMQ:PAIR sockets, a single socket may be connected to
+multiple endpoints using connect(), while simultaneously accepting incoming
+connections from multiple endpoints bound to the socket using bind(). Refer
+to <a href="Socket.html">ZMQ::Socket</a> for a description of the exact
+semantics involved when connecting or binding a socket to multiple
+endpoints.
+</p>
+
+        </div>
+      </div>
+
+
+      <div id="method-M000012" class="method-detail">
+        <a name="M000012"></a>
+
+        <div class="method-heading">
+
+          <a href="Socket.src/M000012.html" target="Code" class="method-signature"
+            onclick="popupCode('Socket.src/M000012.html');return false;">
+
+          <span class="method-name">socket.close() &rarr; nil<br />
+</span>
+
+          </a>
+
+        </div>
+
+        <div class="method-description">
+
+          <p>
+Destroys the 0MQ socket. All active connections on the socket shall be
+terminated, and resources associated with the socket shall be released. Any
+outstanding messages sent with send() but not yet physically sent to the
+network shall be dropped. Likewise, any outstanding messages physically
+received from the network but not yet received by the application with
+recv() shall also be dropped.
+</p>
+
+        </div>
+      </div>
+
+
+      <div id="method-M000009" class="method-detail">
+        <a name="M000009"></a>
+
+        <div class="method-heading">
+
+          <a href="Socket.src/M000009.html" target="Code" class="method-signature"
+            onclick="popupCode('Socket.src/M000009.html');return false;">
+
+          <span class="method-name">socket.connect(endpoint) &rarr; nil<br />
+</span>
+
+          </a>
+
+        </div>
+
+        <div class="method-description">
+
+          <p>
+Connects the socket to the endpoint specified by the <em>endpoint</em>
+argument.
+</p>
+<p>
+The <em>endpoint</em> argument is a string consisting of two parts as
+follows: _transport://address_. The <em>transport</em> part specifies the
+underlying transport protocol to use. The meaning of the <em>address</em>
+part is specific to the underlying transport protocol selected.
+</p>
+<p>
+The following transports are defined:
+</p>
+<dl>
+<dt><em>inproc</em></dt><dd>local in-process (inter-thread) communication transport
+
+</dd>
+<dt><em>ipc</em></dt><dd>local inter-process communication transport
+
+</dd>
+<dt><em>tcp</em></dt><dd>unicast transport using TCP
+
+</dd>
+<dt><em>pgm</em>, <em>epgm</em></dt><dd>reliable multicast transport using PGM
+
+</dd>
+</dl>
+<p>
+With the exception of ZMQ:PAIR sockets, a single socket may be connected to
+multiple endpoints using connect(), while simultaneously accepting incoming
+connections from multiple endpoints bound to the socket using bind(). Refer
+to <a href="Socket.html">ZMQ::Socket</a> for a description of the exact
+semantics involved when connecting or binding a socket to multiple
+endpoints.
+</p>
+<p>
+<b>NOTE:</b> The connection will not be performed immediately, but as
+needed by 0MQ. Thus, a successful invocation of connect() does not indicate
+that a physical connection was or can actually be established.
+</p>
+
+        </div>
+      </div>
+
+
+      <div id="method-M000006" class="method-detail">
+        <a name="M000006"></a>
+
+        <div class="method-heading">
+
+          <a href="Socket.src/M000006.html" target="Code" class="method-signature"
+            onclick="popupCode('Socket.src/M000006.html');return false;">
+
+          <span class="method-name">socket.getsockopt(option)<br />
+</span>
+
+          </a>
+
+        </div>
+
+        <div class="method-description">
+
+          <p>
+Retrieves the value of the specified 0MQ socket option.
+</p>
+<p>
+The following options can be retrievesd with the getsockopt() function:
+</p>
+<h2>ZMQ::RCVMORE: More message parts to follow</h2>
+<p>
+The ZMQ::RCVMORE option shall return a boolean value indicating if the
+multi-part message currently being read from the specified socket has more
+message parts to follow. If there are no message parts to follow or if the
+message currently being read is not a multi-part message a value of false
+shall be returned. Otherwise, a value of true shall be returned.
+</p>
+<p>
+Refer to send() and recv() for a detailed description of sending/receiving
+multi-part messages.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Boolean
+
+</dd>
+<dt>Option value unit</dt><dd>N/A
+
+</dd>
+<dt>Default value</dt><dd>N/A
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+<h2>ZMQ::HWM: Retrieve high water mark</h2>
+<p>
+The ZMQ::HWM option shall retrieve the high water mark for the specified
+<em>socket</em>. The high water mark is a hard limit on the maximum number
+of outstanding messages 0MQ shall queue in memory for any single peer that
+the specified <em>socket</em> is communicating with.
+</p>
+<p>
+If this limit has been reached the socket shall enter an exceptional state
+and depending on the socket type, 0MQ shall take appropriate action such as
+blocking or dropping sent messages. Refer to the individual socket
+descriptions in <a href="Socket.html">ZMQ::Socket</a> for details on the
+exact action taken for each socket type.
+</p>
+<p>
+The default ZMQ::HWM value of zero means &#8220;no limit&#8221;.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>messages
+
+</dd>
+<dt>Default value</dt><dd>0
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+<h2>ZMQ::SWAP: Retrieve disk offload size</h2>
+<p>
+The ZMQ::SWAP option shall retrieve the disk offload (swap) size for the
+specified <em>socket</em>. A socket which has ZMQ::SWAP set to a non-zero
+value may exceed it’s high water mark; in this case outstanding messages
+shall be offloaded to storage on disk rather than held in memory.
+</p>
+<p>
+The value of ZMQ::SWAP defines the maximum size of the swap space in bytes.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>bytes
+
+</dd>
+<dt>Default value</dt><dd>0
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+<h2>ZMQ::AFFINITY: Retrieve I/O thread affinity</h2>
+<p>
+The ZMQ::AFFINITY option shall retrieve the I/O thread affinity for newly
+created connections on the specified <em>socket</em>.
+</p>
+<p>
+Affinity determines which threads from the 0MQ I/O thread pool associated
+with the socket’s <em>context</em> shall handle newly created
+connections. A value of zero specifies no affinity, meaning that work shall
+be distributed fairly among all 0MQ I/O threads in the thread pool. For
+non-zero values, the lowest bit corresponds to thread 1, second lowest bit
+to thread 2 and so on. For example, a value of 3 specifies that subsequent
+connections on <em>socket</em> shall be handled exclusively by I/O threads
+1 and 2.
+</p>
+<p>
+See also <a href="Context.html#M000003">ZMQ::Context#new</a> for details on
+allocating the number of I/O threads for a specific <em>context</em>.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>N/A (bitmap)
+
+</dd>
+<dt>Default value</dt><dd>0
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+<h2>ZMQ::IDENTITY: Retrieve socket identity</h2>
+<p>
+The ZMQ::IDENTITY option shall retrieve the identity of the specified
+<em>socket</em>. <a href="Socket.html">Socket</a> identity determines if
+existing 0MQ infastructure (<em>message queues</em>, <em>forwarding
+devices</em>) shall be identified with a specific application and persist
+across multiple runs of the application.
+</p>
+<p>
+If the socket has no identity, each run of an application is completely
+separate from other runs. However, with identity set the socket shall
+re-use any existing 0MQ infrastructure configured by the previous run(s).
+Thus the application may receive messages that were sent in the meantime,
+<em>message queue</em> limits shall be shared with previous run(s) and so
+on.
+</p>
+<p>
+Identity can be at least one byte and at most 255 bytes long. Identities
+starting with binary zero are reserved for use by 0MQ infrastructure.
+</p>
+<dl>
+<dt>Option value type</dt><dd>String
+
+</dd>
+<dt>Option value unit</dt><dd>N/A
+
+</dd>
+<dt>Default value</dt><dd>nil
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+<h2>ZMQ::RATE: Retrieve multicast data rate</h2>
+<p>
+The ZMQ::Rate option shall retrieve the maximum send or receive data rate
+for multicast transports using the specified <em>socket</em>.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>kilobits per second
+
+</dd>
+<dt>Default value</dt><dd>100
+
+</dd>
+<dt>Applicable socket types</dt><dd>all, when using multicast transports
+
+</dd>
+</dl>
+<h2>ZMQ::RECOVERY_IVL: Get multicast recovery interval</h2>
+<p>
+The ZMQ::RECOVERY_IVL option shall retrieve the recovery interval for
+multicast transports using the specified <em>socket</em>. The recovery
+interval determines the maximum time in seconds that a receiver can be
+absent from a multicast group before unrecoverable data loss will occur.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>seconds
+
+</dd>
+<dt>Default value</dt><dd>10
+
+</dd>
+<dt>Applicable socket types</dt><dd>all, when using multicast transports
+
+</dd>
+</dl>
+<h2>ZMQ::MCAST_LOOP: Control multicast loopback</h2>
+<p>
+The ZMQ::MCAST_LOOP option controls whether data sent via multicast
+transports can also be received by the sending host via loopback. A value
+of zero indicates that the loopback functionality is disabled, while the
+default value of 1 indicates that the loopback functionality is enabled.
+Leaving multicast loopback enabled when it is not required can have a
+negative impact on performance. Where possible, disable ZMQ::MCAST_LOOP in
+production environments.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Boolean
+
+</dd>
+<dt>Option value unit</dt><dd>N/A
+
+</dd>
+<dt>Default value</dt><dd>true
+
+</dd>
+<dt>Applicable socket types</dt><dd>all, when using multicast transports
+
+</dd>
+</dl>
+<h2>ZMQ::SNDBUF: Retrieve kernel transmit buffer size</h2>
+<p>
+The ZMQ::SNDBUF option shall retrieve the underlying kernel transmit buffer
+size for the specified <em>socket</em>. A value of zero means that the OS
+default is in effect. For details refer to your operating system
+documentation for the SO_SNDBUF socket option.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>bytes
+
+</dd>
+<dt>Default value</dt><dd>0
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+<h2>ZMQ::RCVBUF: Retrieve kernel receive buffer size</h2>
+<p>
+The ZMQ::RCVBUF option shall retrieve the underlying kernel receive buffer
+size for the specified <em>socket</em>. A value of zero means that the OS
+default is in effect. For details refer to your operating system
+documentation for the SO_RCVBUF socket option.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>bytes
+
+</dd>
+<dt>Default value</dt><dd>0
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+
+        </div>
+      </div>
+
+
+      <div id="method-M000011" class="method-detail">
+        <a name="M000011"></a>
+
+        <div class="method-heading">
+
+          <a href="Socket.src/M000011.html" target="Code" class="method-signature"
+            onclick="popupCode('Socket.src/M000011.html');return false;">
+
+          <span class="method-name">socket.recv(flags=0) &rarr; message | nil<br />
+</span>
+
+          </a>
+
+        </div>
+
+        <div class="method-description">
+
+          <p>
+Receives a message from the <em>socket</em>. If there are no messages
+available on the <em>socket</em>, the recv() function shall block until the
+request can be satisfied. The <em>flags</em> argument is a combination of
+the flags defined below:
+</p>
+<dl>
+<dt>ZMQ::NOBLOCK</dt><dd>Specifies that the operation should be performed in non-blocking mode. If
+there are no messages available on the <em>socket</em>, the recv() function
+shall fail and return <em>nil</em>.
+
+</dd>
+</dl>
+<h2>Multi-part messages</h2>
+<p>
+A 0MQ message is composed of 1 or more message parts. 0MQ ensures atomic
+delivery of messages; peers shall receive either all <em>message parts</em>
+of a message or none at all.
+</p>
+<p>
+The total number of message parts is unlimited.
+</p>
+<p>
+An application wishing to determine if a message is composed of multiple
+parts does so by retrieving the value of the ZMQ::RCVMORE socket option on
+the socket it is receiving the message from, using getsockopt(). If there
+are no message parts to follow, or if the message is not composed of
+multiple parts, ZMQ::RCVMORE shall report a value of false. Otherwise,
+ZMQ::RCVMORE shall report a value of true, indicating that more message
+parts are to follow.
+</p>
+
+        </div>
+      </div>
+
+
+      <div id="method-M000010" class="method-detail">
+        <a name="M000010"></a>
+
+        <div class="method-heading">
+
+          <a href="Socket.src/M000010.html" target="Code" class="method-signature"
+            onclick="popupCode('Socket.src/M000010.html');return false;">
+
+          <span class="method-name">socket.send(message, flags=0) &rarr; true | false<br />
+</span>
+
+          </a>
+
+        </div>
+
+        <div class="method-description">
+
+          <p>
+Queue the message referenced by the <em>msg</em> argument to be send to the
+<em>socket</em>. The <em>flags</em> argument is a combination of the flags
+defined below:
+</p>
+<dl>
+<dt>ZMQ::NOBLOCK</dt><dd>Specifies that the operation should be performed in non-blocking mode. If
+the message cannot be queued on the <em>socket</em>, the function shall
+fail and return <em>false</em>.
+
+</dd>
+<dt>ZMQ::SNDMORE</dt><dd>Specifies that the message being sent is a multi-part message, and that
+further message parts are to follow. Refer to the section regarding
+multi-part messages below for a detailed description.
+
+</dd>
+</dl>
+<p>
+<b>NOTE:</b> A successful invocation of send() does not indicate that the
+message has been transmitted to the network, only that it has been queued
+on the socket and 0MQ has assumed responsibility for the message.
+</p>
+<h2>Multi-part messages</h2>
+<p>
+A 0MQ message is composed of 1 or more message parts. 0MQ ensures atomic
+delivery of messages; peers shall receive either all <em>message parts</em>
+of a message or none at all.
+</p>
+<p>
+The total number of message parts is unlimited.
+</p>
+<p>
+An application wishing to send a multi-part message does so by specifying
+the ZMQ::SNDMORE flag to send(). The presence of this flag indicates to 0MQ
+that the message being sent is a multi-part message and that more message
+parts are to follow. When the application wishes to send the final message
+part it does so by calling send() without the ZMQ::SNDMORE flag; this
+indicates that no more message parts are to follow.
+</p>
+<p>
+This function returns <em>true</em> if successful, <em>false</em> if not.
+</p>
+
+        </div>
+      </div>
+
+
+      <div id="method-M000007" class="method-detail">
+        <a name="M000007"></a>
+
+        <div class="method-heading">
+
+          <a href="Socket.src/M000007.html" target="Code" class="method-signature"
+            onclick="popupCode('Socket.src/M000007.html');return false;">
+
+          <span class="method-name">socket.setsockopt(option, value) &rarr; nil<br />
+</span>
+
+          </a>
+
+        </div>
+
+        <div class="method-description">
+
+          <p>
+Sets the value of a 0MQ socket option.
+</p>
+<p>
+The following socket options can be set with the setsockopt() function:
+</p>
+<h2>ZMQ::HWM: Set high water mark</h2>
+<p>
+The ZMQ::HWM option shall set the high water mark for the specified
+<em>socket</em>. The high water mark is a hard limit on the maximum number
+of outstanding messages 0MQ shall queue in memory for any single peer that
+the specified <em>socket</em> is communicating with.
+</p>
+<p>
+If this limit has been reached the socket shall enter an exceptional state
+and depending on the socket type, 0MQ shall take appropriate action such as
+blocking or dropping sent messages. Refer to the individual socket
+descriptions in <a href="Socket.html">ZMQ::Socket</a> for details on the
+exact action taken for each socket type.
+</p>
+<p>
+The default ZMQ::HWM value of zero means &#8220;no limit&#8221;.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>messages
+
+</dd>
+<dt>Default value</dt><dd>0
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+<h2>ZMQ::SWAP: Set disk offload size</h2>
+<p>
+The ZMQ::SWAP option shall set the disk offload (swap) size for the
+specified socket. A socket which has ZMQ::SWAP set to a non-zero value may
+exceed it’s high water mark; in this case outstanding messages shall be
+offloaded to storage on disk rather than held in memory.
+</p>
+<p>
+The value of ZMQ::SWAP defines the maximum size of the swap space in bytes.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>bytes
+
+</dd>
+<dt>Default value</dt><dd>0
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+<h2>ZMQ::AFFINITY: Set I/O thread affinity</h2>
+<p>
+The ZMQ::AFFINITY option shall set the I/O thread affinity for newly
+created connections on the specified socket.
+</p>
+<p>
+Affinity determines which threads from the 0MQ I/O thread pool associated
+with the socket’s <em>context</em> shall handle newly created
+connections. A value of zero specifies no affinity, meaning that work shall
+be distributed fairly among all 0MQ I/O threads in the thread pool. For
+non-zero values, the lowest bit corresponds to thread 1, second lowest bit
+to thread 2 and so on. For example, a value of 3 specifies that subsequent
+connections on socket shall be handled exclusively by I/O threads 1 and 2.
+</p>
+<p>
+See also <a href="Context.html#M000003">ZMQ::Context#new</a> for details on
+allocating the number of I/O threads for a specific <em>context</em>.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>N/A (bitmap)
+
+</dd>
+<dt>Default value</dt><dd>0
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+<h2>ZMQ::IDENTITY: Set socket identity</h2>
+<p>
+The ZMQ::IDENTITY option shall set the identity of the specified socket. <a
+href="Socket.html">Socket</a> identity determines if existing 0MQ
+infastructure (<em>message queues</em>, <em>forwarding devices</em>) shall
+be identified with a specific application and persist across multiple runs
+of the application.
+</p>
+<p>
+If the socket has no identity, each run of an application is completely
+separate from other runs. However, with identity set the socket shall
+re-use any existing 0MQ infrastructure configured by the previous run(s).
+Thus the application may receive messages that were sent in the meantime,
+<em>message queue</em> limits shall be shared with previous run(s) and so
+on.
+</p>
+<p>
+Identity should be at least one byte and at most 255 bytes long. Identities
+starting with binary zero are reserved for use by 0MQ infrastructure.
+</p>
+<dl>
+<dt>Option value type</dt><dd>String
+
+</dd>
+<dt>Option value unit</dt><dd>N/A
+
+</dd>
+<dt>Default value</dt><dd>nil
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+<p>
+ZMQ::SUBSCRIBE: Establish message filter The ZMQ::SUBSCRIBE option shall
+establish a new message filter on a ZMQ::SUB socket. Newly created ZMQ::SUB
+sockets shall filter out all incoming messages, therefore you should call
+this option to establish an initial message filter.
+</p>
+<p>
+An empty <em>value</em> of length zero shall subscribe to all incoming
+messages. A non-empty <em>value</em> shall subscribe to all messages
+beginning with the specified prefix. Mutiple filters may be attached to a
+single ZMQ::SUB socket, in which case a message shall be accepted if it
+matches at least one filter.
+</p>
+<dl>
+<dt>Option value type</dt><dd>String
+
+</dd>
+<dt>Option value unit</dt><dd>N/A
+
+</dd>
+<dt>Default value</dt><dd>N/A
+
+</dd>
+<dt>Applicable socket types</dt><dd>ZMQ::SUB
+
+</dd>
+</dl>
+<h2>ZMQ::UNSUBSCRIBE: Remove message filter</h2>
+<p>
+The ZMQ::UNSUBSCRIBE option shall remove an existing message filter on a
+ZMQ::SUB socket. The filter specified must match an existing filter
+previously established with the ZMQ::SUBSCRIBE option. If the socket has
+several instances of the same filter attached the ZMQ::UNSUBSCRIBE option
+shall remove only one instance, leaving the rest in place and functional.
+</p>
+<dl>
+<dt>Option value type</dt><dd>String
+
+</dd>
+<dt>Option value unit</dt><dd>N/A
+
+</dd>
+<dt>Default value</dt><dd>nil
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+<h2>ZMQ::RATE: Set multicast data rate</h2>
+<p>
+The ZMQ::RATE option shall set the maximum send or receive data rate for
+multicast transports such as <em>pgm</em> using the specified socket.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>kilobits per second
+
+</dd>
+<dt>Default value</dt><dd>100
+
+</dd>
+<dt>Applicable socket types</dt><dd>all, when using multicast transports
+
+</dd>
+</dl>
+<h2>ZMQ::RECOVERY_IVL: Set multicast recovery interval</h2>
+<p>
+The ZMQ::RECOVERY_IVL option shall set the recovery interval for multicast
+transports using the specified <em>socket</em>. The recovery interval
+determines the maximum time in seconds that a receiver can be absent from a
+multicast group before unrecoverable data loss will occur.
+</p>
+<p>
+<b>Caution:</b> Exercise care when setting large recovery intervals as the
+data needed for recovery will be held in memory. For example, a 1 minute
+recovery interval at a data rate of 1Gbps requires a 7GB in-memory buffer.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>seconds
+
+</dd>
+<dt>Default value</dt><dd>10
+
+</dd>
+<dt>Applicable socket types</dt><dd>all, when using multicast transports
+
+</dd>
+</dl>
+<h2>ZMQ::MCAST_LOOP: Control multicast loopback</h2>
+<p>
+The ZMQ::MCAST_LOOP option shall control whether data sent via multicast
+transports using the specified <em>socket</em> can also be received by the
+sending host via loopback. A value of zero disables the loopback
+functionality, while the default value of 1 enables the loopback
+functionality. Leaving multicast loopback enabled when it is not required
+can have a negative impact on performance. Where possible, disable
+ZMQ::MCAST_LOOP in production environments.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Boolean
+
+</dd>
+<dt>Option value unit</dt><dd>N/A
+
+</dd>
+<dt>Default value</dt><dd>true
+
+</dd>
+<dt>Applicable socket types</dt><dd>all, when using multicast transports
+
+</dd>
+</dl>
+<h2>ZMQ::SNDBUF: Set kernel transmit buffer size</h2>
+<p>
+The ZMQ::SNDBUF option shall set the underlying kernel transmit buffer size
+for the socket to the specified size in bytes. A value of zero means leave
+the OS default unchanged. For details please refer to your operating system
+documentation for the SO_SNDBUF socket option.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>bytes
+
+</dd>
+<dt>Default value</dt><dd>0
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+<h2>ZMQ::RCVBUF: Set kernel receive buffer size</h2>
+<p>
+The ZMQ::RCVBUF option shall set the underlying kernel receive buffer size
+for the socket to the specified size in bytes. A value of zero means leave
+the OS default unchanged. For details refer to your operating system
+documentation for the SO_RCVBUF socket option.
+</p>
+<dl>
+<dt>Option value type</dt><dd>Integer
+
+</dd>
+<dt>Option value unit</dt><dd>bytes
+
+</dd>
+<dt>Default value</dt><dd>0
+
+</dd>
+<dt>Applicable socket types</dt><dd>all
+
+</dd>
+</dl>
+
+        </div>
+      </div>
+
+
+
+    </div>
+
+
+
+
+  </div>
+
+<div id="validator-badges">
+  <p><small><a href="http://validator.w3.org/check/referer">[Validate]</a></small></p>
+</div>
+
+</body>
+</html>

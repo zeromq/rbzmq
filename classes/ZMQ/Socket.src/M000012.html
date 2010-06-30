@@ -1,0 +1,37 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>close (ZMQ::Socket)</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <link rel="stylesheet" href="../../.././rdoc-style.css" type="text/css" media="screen" />
+</head>
+<body class="standalone-code">
+  <pre>/*
+ * call-seq:
+ *   socket.close() -&gt; nil
+ *
+ * Destroys the 0MQ socket.  All active connections on the socket shall be
+ * terminated, and resources associated with the socket shall be released.
+ * Any outstanding messages sent with send() but not yet physically sent
+ * to the network shall be dropped.  Likewise, any outstanding messages
+ * physically received from the network but not yet received by the
+ * application with recv() shall also be dropped.
+ */
+static VALUE socket_close (VALUE self_)
+{
+    void * s = NULL;
+    Data_Get_Struct (self_, void, s);
+    if (s != NULL) {
+        int rc = zmq_close (s);
+        if (rc != 0) {
+            rb_raise (rb_eRuntimeError, &quot;%s&quot;, zmq_strerror (zmq_errno ()));
+            return Qnil;
+        }
+
+        DATA_PTR (self_) = NULL;
+    }
+    return Qnil;
+}</pre>
+</body>
+</html>

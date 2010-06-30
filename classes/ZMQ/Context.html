@@ -1,0 +1,255 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Class: ZMQ::Context [zmq-2.0.7 Documentation]</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Script-Type" content="text/javascript" />
+  <link rel="stylesheet" href="../.././rdoc-style.css" type="text/css" media="screen" />
+  <script type="text/javascript">
+  // <![CDATA[
+
+  function popupCode( url ) {
+    window.open(url, "Code", "resizable=yes,scrollbars=yes,toolbar=no,status=no,height=150,width=400")
+  }
+
+  function toggleCode( id ) {
+    if ( document.getElementById )
+      elem = document.getElementById( id );
+    else if ( document.all )
+      elem = eval( "document.all." + id );
+    else
+      return false;
+
+    elemStyle = elem.style;
+
+    if ( elemStyle.display != "block" ) {
+      elemStyle.display = "block"
+    } else {
+      elemStyle.display = "none"
+    }
+
+    return true;
+  }
+
+  // Make codeblocks hidden by default
+  document.writeln( "<style type=\"text/css\">div.method-source-code { display: none }<\/style>" )
+
+  // ]]>
+  </script>
+
+</head>
+<body>
+
+
+    <div id="classHeader">
+        <table class="header-table">
+        <tr class="top-aligned-row">
+          <td><strong>Class</strong></td>
+          <td class="class-name-in-header">ZMQ::Context</td>
+        </tr>
+        <tr class="top-aligned-row">
+            <td><strong>In:</strong></td>
+            <td>
+
+
+                <a href="../../files/rbzmq_c.html">
+
+                rbzmq.c
+
+                </a>
+
+
+        <br />
+
+            </td>
+        </tr>
+
+
+        <tr class="top-aligned-row">
+            <td><strong>Parent:</strong></td>
+            <td>
+
+                Object
+
+            </td>
+        </tr>
+
+        </table>
+    </div>
+  <!-- banner header -->
+
+  <div id="bodyContent">
+
+  <div id="contextContent">
+
+    <div id="description">
+      <p>
+ZeroMQ library context.
+</p>
+
+    </div>
+
+   </div>
+
+
+    <div id="method-list">
+      <h3 class="section-bar">Methods</h3>
+
+      <div class="name-list">
+
+        <a href="#M000005">close</a>&nbsp;&nbsp;
+
+        <a href="#M000003">new</a>&nbsp;&nbsp;
+
+        <a href="#M000004">socket</a>&nbsp;&nbsp;
+
+      </div>
+    </div>
+
+  </div>
+
+    <!-- if includes -->
+
+    <div id="section">
+
+
+
+
+    <!-- if method_list -->
+
+    <div id="methods">
+
+      <h3 class="section-bar">Public Class methods</h3>
+
+
+      <div id="method-M000003" class="method-detail">
+        <a name="M000003"></a>
+
+        <div class="method-heading">
+
+          <a href="Context.src/M000003.html" target="Code" class="method-signature"
+            onclick="popupCode('Context.src/M000003.html');return false;">
+
+          <span class="method-name">new(io_threads=1)<br />
+</span>
+
+          </a>
+
+        </div>
+
+        <div class="method-description">
+
+          <p>
+Initializes a new 0MQ context. The io_threads argument specifies the size
+of the 0MQ thread pool to handle I/O operations. If your application is
+using only the <em>inproc</em> transport for you may set this to zero;
+otherwise, set it to at least one.
+</p>
+
+        </div>
+      </div>
+
+
+      <h3 class="section-bar">Public Instance methods</h3>
+
+
+      <div id="method-M000005" class="method-detail">
+        <a name="M000005"></a>
+
+        <div class="method-heading">
+
+          <a href="Context.src/M000005.html" target="Code" class="method-signature"
+            onclick="popupCode('Context.src/M000005.html');return false;">
+
+          <span class="method-name">zmq.close() &rarr; nil<br />
+</span>
+
+          </a>
+
+        </div>
+
+        <div class="method-description">
+
+          <p>
+Terminates the 0MQ context. If there are no longer any sockets open within
+context at the time zmq_term() is called then context shall be shut down
+and all associated resources shall be released immediately.
+</p>
+<p>
+Otherwise, the following applies:
+</p>
+<ul>
+<li>The close() function shall return immediately.
+
+</li>
+<li>Any blocking operations currently in progress on sockets open within
+context shall return immediately with an error code of ETERM.
+
+</li>
+<li>With the exception of <a
+href="Socket.html#M000012">ZMQ::Socket#close()</a>, any further operations
+on sockets open within context shall fail with an error code of ETERM.
+
+</li>
+<li>The actual shutdown of context, and release of any associated resources,
+shall be delayed until the last socket within it is closed with <a
+href="Socket.html#M000012">ZMQ::Socket#close()</a>.
+
+</li>
+</ul>
+
+        </div>
+      </div>
+
+
+      <div id="method-M000004" class="method-detail">
+        <a name="M000004"></a>
+
+        <div class="method-heading">
+
+          <a href="Context.src/M000004.html" target="Code" class="method-signature"
+            onclick="popupCode('Context.src/M000004.html');return false;">
+
+          <span class="method-name">zmq.socket(socket_type)<br />
+</span>
+
+          </a>
+
+        </div>
+
+        <div class="method-description">
+
+          <p>
+Creates a new 0MQ socket. The socket_type argument specifies the socket
+type, which determines the semantics of communication over the socket.
+</p>
+<p>
+The newly created socket is initially unbound, and not associated with any
+endpoints. In order to establish a message flow a socket must first be
+connected to at least one endpoint with connect(), or at least one endpoint
+must be created for accepting incoming connections with bind().
+</p>
+<p>
+For a description of the various socket types, see <a
+href="Socket.html">ZMQ::Socket</a>.
+</p>
+
+        </div>
+      </div>
+
+
+
+    </div>
+
+
+
+
+  </div>
+
+<div id="validator-badges">
+  <p><small><a href="http://validator.w3.org/check/referer">[Validate]</a></small></p>
+</div>
+
+</body>
+</html>

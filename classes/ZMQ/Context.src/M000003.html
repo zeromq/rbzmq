@@ -1,0 +1,38 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>new (ZMQ::Context)</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <link rel="stylesheet" href="../../.././rdoc-style.css" type="text/css" media="screen" />
+</head>
+<body class="standalone-code">
+  <pre>/*
+ * Document-method: new
+ *
+ * call-seq:
+ *   new(io_threads=1)
+ *
+ * Initializes a new 0MQ context. The io_threads argument specifies the size
+ * of the 0MQ thread pool to handle I/O operations. If your application is
+ * using only the _inproc_ transport for you may set this to zero; otherwise,
+ * set it to at least one.
+ */
+
+static VALUE context_initialize (int argc_, VALUE* argv_, VALUE self_)
+{
+    VALUE io_threads;
+    rb_scan_args (argc_, argv_, &quot;01&quot;, &amp;io_threads);
+
+    assert (!DATA_PTR (self_));
+    void *ctx = zmq_init (NIL_P (io_threads) ? 1 : NUM2INT (io_threads));
+    if (!ctx) {
+        rb_raise (rb_eRuntimeError, &quot;%s&quot;, zmq_strerror (zmq_errno ()));
+        return Qnil;
+    }
+
+    DATA_PTR (self_) = (void*) ctx;
+    return self_;
+}</pre>
+</body>
+</html>

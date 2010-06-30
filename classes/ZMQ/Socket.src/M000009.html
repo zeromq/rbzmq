@@ -1,0 +1,53 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>connect (ZMQ::Socket)</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <link rel="stylesheet" href="../../.././rdoc-style.css" type="text/css" media="screen" />
+</head>
+<body class="standalone-code">
+  <pre>/*
+ * call-seq:
+ *   socket.connect(endpoint) -&gt; nil
+ *
+ * Connects the socket to the endpoint specified by the _endpoint_ argument.
+ *
+ * The _endpoint_ argument is a string consisting of two parts as follows:
+ * _transport://address_.  The _transport_ part specifies the underlying
+ * transport protocol to use.  The meaning of the _address_ part is specific
+ * to the underlying transport protocol selected.
+ *
+ * The following transports are defined:
+ *
+ * [_inproc_] local in-process (inter-thread) communication transport
+ * [_ipc_] local inter-process communication transport
+ * [_tcp_] unicast transport using TCP
+ * [_pgm_, _epgm_] reliable multicast transport using PGM
+ *
+ * With the exception of ZMQ:PAIR sockets, a single socket may be connected to
+ * multiple endpoints using connect(), while simultaneously accepting
+ * incoming connections from multiple endpoints bound to the socket using
+ * bind(). Refer to ZMQ::Socket for a description of the exact semantics
+ * involved when connecting or binding a socket to multiple endpoints.
+ *
+ * &lt;b&gt;NOTE:&lt;/b&gt; The connection will not be performed immediately, but as needed by
+ * 0MQ.  Thus, a successful invocation of connect() does not indicate that
+ * a physical connection was or can actually be established.
+ */
+static VALUE socket_connect (VALUE self_, VALUE addr_)
+{
+    void * s;
+    Data_Get_Struct (self_, void, s);
+    Check_Socket (s);
+
+    int rc = zmq_connect (s, rb_string_value_cstr (&amp;addr_));
+    if (rc != 0) {
+        rb_raise (rb_eRuntimeError, &quot;%s&quot;, zmq_strerror (zmq_errno ()));
+        return Qnil;
+    }
+
+    return Qnil;
+}</pre>
+</body>
+</html>

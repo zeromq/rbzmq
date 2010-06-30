@@ -1,0 +1,40 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>socket (ZMQ::Context)</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <link rel="stylesheet" href="../../.././rdoc-style.css" type="text/css" media="screen" />
+</head>
+<body class="standalone-code">
+  <pre>/*
+ * Document-method: socket
+ *
+ * call-seq:
+ *   zmq.socket(socket_type)
+ *
+ * Creates a new 0MQ socket.  The socket_type argument specifies the socket
+ * type, which determines the semantics of communication over the socket.
+ *
+ * The newly created socket is initially unbound, and not associated with any
+ * endpoints. In order to establish a message flow a socket must first be
+ * connected to at least one endpoint with connect(), or at least one
+ * endpoint must be created for accepting incoming connections with
+ * bind().
+ *
+ * For a description of the various socket types, see ZMQ::Socket.
+ */
+static VALUE context_socket (VALUE self_, VALUE type_)
+{
+    void * c = NULL;
+    Data_Get_Struct (self_, void, c);
+    void * s = zmq_socket (c, NUM2INT (type_));
+    if (!s) {
+        rb_raise (rb_eRuntimeError, &quot;%s&quot;, zmq_strerror (zmq_errno ()));
+        return Qnil;
+    }
+
+    return Data_Wrap_Struct(socket_type, 0, socket_free, s);
+}</pre>
+</body>
+</html>
