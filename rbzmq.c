@@ -268,72 +268,57 @@ static VALUE zmq_poll_blocking (void* args_)
 
 #endif
 
-/*
- * call-seq:
- *   ZMQ.select(in, out=[], err=[], timeout=nil) -> [in, out, err] | nil
- *
- * Like IO.select, but also works with 0MQ sockets.
- */
-static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
-{
-    VALUE readset, writeset, errset, timeout;
-    rb_scan_args (argc_, argv_, "13", &readset, &writeset, &errset, &timeout);
-
+struct select_arg {
+    VALUE readset;
+    VALUE writeset;
+    VALUE errset;
     long timeout_usec;
-    int rc, nitems, i;
-    zmq_pollitem_t *items, *item;
+    zmq_pollitem_t *items;
+};
 
-    if (!NIL_P (readset)) Check_Type (readset, T_ARRAY);
-    if (!NIL_P (writeset)) Check_Type (writeset, T_ARRAY);
-    if (!NIL_P (errset)) Check_Type (errset, T_ARRAY);
-    
-    if (NIL_P (timeout))
-        timeout_usec = -1;
-    else
-        timeout_usec = (long)(NUM2DBL (timeout) * 1000000);
-    
-    /* Conservative estimate for nitems before we traverse the lists. */
-    nitems = (NIL_P (readset) ? 0 : RARRAY_LEN (readset)) +
-             (NIL_P (writeset) ? 0 : RARRAY_LEN (writeset)) +
-             (NIL_P (errset) ? 0 : RARRAY_LEN (errset));
-    items = (zmq_pollitem_t*)ruby_xmalloc(sizeof(zmq_pollitem_t) * nitems);
+static VALUE internal_select(VALUE argval)
+{
+    struct select_arg *arg = (struct select_arg *)argval;
+
+    int rc, nitems, i;
+    zmq_pollitem_t *item;
 
     struct poll_state ps;
     ps.nitems = 0;
-    ps.items = items;
+    ps.items = arg->items;
     ps.io_objects = rb_ary_new ();
 
-    if (!NIL_P (readset)) {
+    if (!NIL_P (arg->readset)) {
         ps.event = ZMQ_POLLIN;
-        rb_iterate(rb_each, readset, (iterfunc)poll_add_item, (VALUE)&ps);
+        rb_iterate(rb_each, arg->readset, (iterfunc)poll_add_item, (VALUE)&ps);
     }
 
-    if (!NIL_P (writeset)) {
+    if (!NIL_P (arg->writeset)) {
         ps.event = ZMQ_POLLOUT;
-        rb_iterate(rb_each, writeset, (iterfunc)poll_add_item, (VALUE)&ps);
+        rb_iterate(rb_each, arg->writeset, (iterfunc)poll_add_item, (VALUE)&ps);
     }
 
-    if (!NIL_P (errset)) {
+    if (!NIL_P (arg->errset)) {
         ps.event = ZMQ_POLLERR;
-        rb_iterate(rb_each, errset, (iterfunc)poll_add_item, (VALUE)&ps);
+        rb_iterate(rb_each, arg->errset, (iterfunc)poll_add_item, (VALUE)&ps);
     }
     
     /* Reset nitems to the actual number of zmq_pollitem_t records we're sending. */
     nitems = ps.nitems;
 
 #ifdef HAVE_RUBY_INTERN_H
-    if (timeout_usec != 0) {
+    if (arg->timeout_usec != 0) {
         struct zmq_poll_args poll_args;
-        poll_args.items = items;
-        poll_args.nitems = nitems;
-        poll_args.timeout_usec = timeout_usec;
+        poll_args.items = ps.items;
+        poll_args.nitems = ps.nitems;
+        poll_args.timeout_usec = arg->timeout_usec;
 
         rb_thread_blocking_region (zmq_poll_blocking, (void*)&poll_args, NULL, NULL);
         rc = poll_args.rc;
     }
     else
 #endif
-        rc = zmq_poll (items, nitems, timeout_usec);
+        rc = zmq_poll (ps.items, ps.nitems, arg->timeout_usec);
     
     if (rc == -1) {
         rb_raise(rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
@@ -346,7 +331,7 @@ static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
     VALUE write_active = rb_ary_new ();
     VALUE err_active = rb_ary_new ();
     
-    for (i = 0, item = &items[0]; i < nitems; i++, item++) {
+    for (i = 0, item = &ps.items[0]; i < nitems; i++, item++) {
         if (item->revents != 0) {
             VALUE io = RARRAY_PTR (ps.io_objects)[i];
             
@@ -359,11 +344,56 @@ static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
         }
     }
     
-    ruby_xfree (items);
-    
     return rb_ary_new3 (3, read_active, write_active, err_active);
 }
 
+static VALUE module_select_internal(VALUE readset, VALUE writeset, VALUE errset, long timeout_usec)
+{
+    int nitems;
+    struct select_arg arg;
+
+    /* Conservative estimate for nitems before we traverse the lists. */
+    nitems = (NIL_P (readset) ? 0 : RARRAY_LEN (readset)) +
+             (NIL_P (writeset) ? 0 : RARRAY_LEN (writeset)) +
+             (NIL_P (errset) ? 0 : RARRAY_LEN (errset));
+    arg.items = (zmq_pollitem_t*)ruby_xmalloc(sizeof(zmq_pollitem_t) * nitems);
+
+    arg.readset = readset;
+    arg.writeset = writeset;
+    arg.errset = errset;
+    arg.timeout_usec = timeout_usec;
+
+#ifdef HAVE_RUBY_INTERN_H
+    return rb_ensure(internal_select, (VALUE)&arg, (void (*)())ruby_xfree, (VALUE)arg.items);
+#else
+    return rb_ensure(internal_select, (VALUE)&arg, (VALUE (*)())ruby_xfree, (VALUE)arg.items);
+#endif
+}
+
+/*
+ * call-seq:
+ *   ZMQ.select(in, out=[], err=[], timeout=nil) -> [in, out, err] | nil
+ *
+ * Like IO.select, but also works with 0MQ sockets.
+ */
+static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
+{
+    VALUE readset, writeset, errset, timeout;
+    rb_scan_args (argc_, argv_, "13", &readset, &writeset, &errset, &timeout);
+
+    long timeout_usec;
+
+    if (!NIL_P (readset)) Check_Type (readset, T_ARRAY);
+    if (!NIL_P (writeset)) Check_Type (writeset, T_ARRAY);
+    if (!NIL_P (errset)) Check_Type (errset, T_ARRAY);
+    
+    if (NIL_P (timeout))
+        timeout_usec = -1;
+    else
+        timeout_usec = (long)(NUM2DBL (timeout) * 1000000);
+
+    return module_select_internal(readset, writeset, errset, timeout_usec);
+}
 
 static void socket_free (void *s)
 {
