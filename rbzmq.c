@@ -558,7 +558,10 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  *
  * == ZMQ::DOWNSTREAM
  *
- * A socket of type ZMQ::DOWNSTREAM is used by a pipeline node to send messages to downstream pipeline nodes. Messages are load-balanced to all connected downstream nodes. The ZMQ::recv() function is not implemented for this socket type.
+ * A socket of type ZMQ::DOWNSTREAM is used by a pipeline node to send messages
+ * to downstream pipeline nodes. Messages are load-balanced to all connected
+ * downstream nodes. The ZMQ::recv() function is not implemented for this socket
+ * type.
  *
  * When a ZMQ::DOWNSTREAM socket enters an exceptional state due to having
  * reached the high water mark for all downstream _nodes_, or if there are no
@@ -605,7 +608,8 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * send() operations on the socket shall block until the peer becomes
  * available for sending; messages are not discarded.
  *
- * *NOTE* ZMQ_PAIR sockets are experimental, and are currently missing several features such as auto-reconnection.
+ * *NOTE* ZMQ_PAIR sockets are experimental, and are currently missing several
+ * features such as auto-reconnection.
  *
  * === Summary of ZMQ::PAIR characteristics
  * [Compatible peer sockets] ZMQ::PAIR
@@ -1158,8 +1162,12 @@ static VALUE zmq_send_blocking (void* args_)
  * _socket_.  The _flags_ argument is a combination of the flags defined
  * below:
  *
- * [ZMQ::NOBLOCK] Specifies that the operation should be performed in non-blocking mode. If the message cannot be queued on the _socket_, the function shall fail and return _false_.
- * [ZMQ::SNDMORE] Specifies that the message being sent is a multi-part message, and that further message parts are to follow. Refer to the section regarding multi-part messages below for a detailed description.
+ * [ZMQ::NOBLOCK] Specifies that the operation should be performed in
+ * non-blocking mode. If the message cannot be queued on the _socket_,
+ * the function shall fail and return _false_.
+ * [ZMQ::SNDMORE] Specifies that the message being sent is a multi-part message,
+ * and that further message parts are to follow. Refer to the section regarding
+ * multi-part messages below for a detailed description.
  *
  * <b>NOTE:</b> A successful invocation of send() does not indicate that the
  * message has been transmitted to the network, only that it has been queued on
@@ -1253,7 +1261,9 @@ static VALUE zmq_recv_blocking (void* args_)
  * satisfied.  The _flags_ argument is a combination of the flags defined
  * below:
  *
- * [ZMQ::NOBLOCK] Specifies that the operation should be performed in non-blocking mode.  If there are no messages available on the _socket_, the recv() function shall fail and return _nil_.
+ * [ZMQ::NOBLOCK] Specifies that the operation should be performed in
+ * non-blocking mode.  If there are no messages available on the _socket_,
+ * the recv() function shall fail and return _nil_.
  *
  * == Multi-part messages
  * A 0MQ message is composed of 1 or more message parts. 0MQ ensures atomic
@@ -1291,7 +1301,8 @@ static VALUE socket_recv (int argc_, VALUE* argv_, VALUE self_)
         recv_args.socket = s;
         recv_args.msg = &msg;
         recv_args.flags = flags;
-        rb_thread_blocking_region (zmq_recv_blocking, (void*) &recv_args, NULL, NULL);
+        rb_thread_blocking_region (zmq_recv_blocking, (void*) &recv_args,
+            NULL, NULL);
         rc = recv_args.rc;
     }
     else
@@ -1390,6 +1401,10 @@ void Init_zmq ()
     rb_define_const (zmq_module, "REP", INT2NUM (ZMQ_REP));
     rb_define_const (zmq_module, "XREQ", INT2NUM (ZMQ_XREQ));
     rb_define_const (zmq_module, "XREP", INT2NUM (ZMQ_XREP));
+    rb_define_const (zmq_module, "PUSH", INT2NUM (ZMQ_PUSH));
+    rb_define_const (zmq_module, "PULL", INT2NUM (ZMQ_PULL));
+
+    //  Obsolete.
     rb_define_const (zmq_module, "UPSTREAM", INT2NUM (ZMQ_UPSTREAM));
     rb_define_const (zmq_module, "DOWNSTREAM", INT2NUM (ZMQ_DOWNSTREAM));
 }
