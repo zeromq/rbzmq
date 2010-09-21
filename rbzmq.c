@@ -1401,8 +1401,14 @@ void Init_zmq ()
     rb_define_const (zmq_module, "REP", INT2NUM (ZMQ_REP));
     rb_define_const (zmq_module, "XREQ", INT2NUM (ZMQ_XREQ));
     rb_define_const (zmq_module, "XREP", INT2NUM (ZMQ_XREP));
+
+#ifdef ZMQ_PUSH
     rb_define_const (zmq_module, "PUSH", INT2NUM (ZMQ_PUSH));
     rb_define_const (zmq_module, "PULL", INT2NUM (ZMQ_PULL));
+#else
+    rb_define_const (zmq_module, "PUSH", INT2NUM (ZMQ_DOWNSTREAM));
+    rb_define_const (zmq_module, "PULL", INT2NUM (ZMQ_UPSTREAM));
+#endif
 
     //  Obsolete.
     rb_define_const (zmq_module, "UPSTREAM", INT2NUM (ZMQ_UPSTREAM));
