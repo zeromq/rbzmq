@@ -136,18 +136,25 @@ static VALUE context_initialize (int argc_, VALUE* argv_, VALUE self_)
  * call-seq:
  *   zmq.close() -> nil
  *
- * Terminates the 0MQ context. If there are no longer any sockets open within
- * context at the time zmq_term() is called then context shall be shut down and
- * all associated resources shall be released immediately.
+ * Terminates the 0MQ context.
  *
- * Otherwise, the following applies:
- * - The close() function shall return immediately.
- * - Any blocking operations currently in progress on sockets open within
- *   context shall return immediately with an error code of ETERM.
- * - With the exception of ZMQ::Socket#close(), any further operations on
- *   sockets open within context shall fail with an error code of ETERM.
- * - The actual shutdown of context, and release of any associated resources, shall
- *   be delayed until the last socket within it is closed with ZMQ::Socket#close().
+ * Context termination is performed in the following steps:
+ *
+ * 1. Any blocking operations currently in progress on sockets open
+ *    within context shall return immediately with an error code of
+ *    ETERM. With the exception of ZMQ::Socket#close(), any further operations on
+ *    sockets open within context shall fail with an error code of ETERM.
+ *
+ * 2. After interrupting all blocking calls, zmq_term() shall block until
+ *    the following conditions are satisfied:
+ *    * All sockets open within context have been closed with ZMQ::Socket#close().
+ *    * For each socket within context, all messages sent by the
+ *      application with ZMQ::Socket#send() have either been physically
+ *      transferred to a network peer, or the socket’s linger period
+ *      set with the ZMQ::LINGER socket option has expired.
+ *
+ * For further details regarding socket linger behaviour refer to the
+ * ZMQ::LINGER option in ZMQ::Socket#setsockopt().
  */
 static VALUE context_close (VALUE self_)
 {
@@ -556,36 +563,36 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * is connected to at least one _node_. When a pipeline stage is connected to
  * multiple _nodes_ data is load-balanced among all connected _nodes_.
  *
- * == ZMQ::DOWNSTREAM
+ * == ZMQ::PUSH
  *
- * A socket of type ZMQ::DOWNSTREAM is used by a pipeline node to send messages
+ * A socket of type ZMQ::PUSH is used by a pipeline node to send messages
  * to downstream pipeline nodes. Messages are load-balanced to all connected
  * downstream nodes. The ZMQ::recv() function is not implemented for this socket
  * type.
  *
- * When a ZMQ::DOWNSTREAM socket enters an exceptional state due to having
+ * When a ZMQ::PUSH socket enters an exceptional state due to having
  * reached the high water mark for all downstream _nodes_, or if there are no
  * downstream _nodes_ at all, then any send() operations on the socket shall
  * block until the exceptional state ends or at least one downstream _node_
  * becomes available for sending; messages are not discarded.
  *
- * === Summary of ZMQ::DOWNSTREAM characteristics
- * [Compatible peer sockets] ZMQ::UPSTREAM
+ * === Summary of ZMQ::PUSH characteristics
+ * [Compatible peer sockets] ZMQ::PULL
  * [Direction] Unidirectional
  * [Send/receive pattern] Send only
  * [Incoming routing strategy] N/A
  * [Outgoing routing strategy] Load-balanced
  * [ZMQ::HWM option action] Block
  *
- * == ZMQ::UPSTREAM
+ * == ZMQ::PULL
  *
- * A socket of type ZMQ::UPSTREAM is used by a pipeline _node_ to receive messages
+ * A socket of type ZMQ::PULL is used by a pipeline _node_ to receive messages
  * from upstream pipeline _nodes_. Messages are fair-queued from among all
  * connected upstream nodes. The send() function is not implemented for
  * this socket type.
  *
- * === Summary of ZMQ::UPSTREAM characteristics
- * [Compatible peer sockets]  ZMQ::DOWNSTREAM
+ * === Summary of ZMQ::PULL characteristics
+ * [Compatible peer sockets]  ZMQ::PUSH
  * [Direction] Unidirectional
  * [Send/receive pattern] Receive only
  * [Incoming routing strategy] Fair-queued
@@ -608,7 +615,7 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * send() operations on the socket shall block until the peer becomes
  * available for sending; messages are not discarded.
  *
- * *NOTE* ZMQ_PAIR sockets are experimental, and are currently missing several
+ * *NOTE* ZMQ::PAIR sockets are experimental, and are currently missing several
  * features such as auto-reconnection.
  *
  * === Summary of ZMQ::PAIR characteristics
@@ -773,6 +780,102 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Default value] 0
  * [Applicable socket types] all
  *
+ * == ZMQ::LINGER: Retrieve linger period for socket shutdown
+ * The ZMQ::LINGER option shall retrieve the linger period for the specified
+ * socket. The linger period determines how long pending messages which have
+ * yet to be sent to a peer shall linger in memory after a socket is closed
+ * with ZMQ::Socket#close(), and further affects the termination of the
+ * socket’s context with ZMQ#close(). The following outlines the different
+ * behaviours:
+ *
+ * * The default value of −1 specifies an infinite linger period.
+ *   Pending messages shall not be discarded after a call to ZMQ::Socket#close();
+ *   attempting to terminate the socket’s context with ZMQ::Context#close() shall block
+ *   until all pending messages have been sent to a peer.
+ *
+ * * The value of 0 specifies no linger period. Pending messages shall be
+ *   discarded immediately when the socket is closed with ZMQ::Socket#close.
+ *
+ * * Positive values specify an upper bound for the linger period in
+ *   milliseconds. Pending messages shall not be discarded after a call to
+ *   ZMQ::Socket#close(); attempting to terminate the socket’s context with
+ *   ZMQ::Context#close() shall block until either all pending messages have been sent
+ *   to a peer, or the linger period expires, after which any pending messages
+ *   shall be discarded.
+ *
+ * [Option value type] Integer
+ * [Option value unit] milliseconds
+ * [Default value] -1 (infinite)
+ * [Applicable socket types] all
+ *
+ * == ZMQ::RECONNECT_IVL: Retrieve reconnection interval
+ * The ZMQ::RECONNECT_IVL option shall retrieve the reconnection interval for
+ * the specified socket. The reconnection interval is the maximum period 0MQ
+ * shall wait between attempts to reconnect disconnected peers when using
+ * connection−oriented transports.
+ *
+ * [Option value type] Integer
+ * [Option value unit] milliseconds
+ * [Default value] 100
+ * [Applicable socket types] all, only for connection-oriented transports
+ *
+ * == ZMQ::BACKLOG: Retrieve maximum length of the queue of outstanding connections
+ * The ZMQ::BACKLOG option shall retrieve the maximum length of the queue of
+ * outstanding peer connections for the specified socket; this only applies to
+ * connection−oriented transports. For details refer to your operating system
+ * documentation for the listen function.
+ *
+ * [Option value type] Integer
+ * [Option value unit] connections
+ * [Default value] 100
+ * [Applicable socket types] all, only for connection-oriented transports
+ *
+ * == ZMQ::FD: Retrieve file descriptor associated with the socket
+ * The ZMQ::FD option shall retrieve the file descriptor associated with the
+ * specified socket. The returned file descriptor can be used to integrate the
+ * socket into an existing event loop; the 0MQ library shall signal any pending
+ * events on the socket in an edge−triggered fashion by making the file
+ * descriptor become ready for reading.
+ *
+ * === Note
+ * The ability to read from the returned file descriptor does not necessarily
+ * indicate that messages are available to be read from, or can be written to,
+ * the underlying socket; applications must retrieve the actual event state
+ * with a subsequent retrieval of the ZMQ::EVENTS option.
+ *
+ * === Caution
+ * The returned file descriptor is intended for use with a poll or similar
+ * system call only. Applications must never attempt to read or write data
+ * to it directly.
+ *
+ * [Option value type] int on POSIX systems, SOCKT on Windows
+ * [Option value unit] N/A
+ * [Default value] N/A
+ * [Applicable socket types] all
+ *
+ * == ZMQ::EVENTS: Retrieve socket event state
+ * The ZMQ::EVENTS option shall retrieve the event state for the specified
+ * socket. The returned value is a bit mask constructed by OR’ing a combination
+ * of the following event flags:
+ *
+ * === ZMQ::POLLIN
+ * Indicates that at least one message may be received from the specified
+ * socket without blocking.
+ *
+ * == ZMQ::POLLOUT
+ * Indicates that at least one message may be sent to the specified socket
+ * without blocking.
+ *
+ * The combination of a file descriptor returned by the ZMQ::FD option being
+ * ready for reading but no actual events returned by a subsequent retrieval of
+ * the ZMQ::EVENTS option is valid; applications should simply ignore this case
+ * and restart their polling operation/event loop.
+ *
+ * [Option value type] uint32_t
+ * [Option value unit] N/A (flags)
+ * [Default value] N/A
+ * [Applicable socket types] all
+ *
  */
 static VALUE socket_getsockopt (VALUE self_, VALUE option_)
 {
@@ -793,6 +896,72 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
     case ZMQ_MCAST_LOOP:
     case ZMQ_SNDBUF:
     case ZMQ_RCVBUF:
+#if ZMQ_VERSION >= 20100
+	case ZMQ_FD:
+        {
+#ifdef _WIN32
+			SOCKET optval;
+#else
+			int optval;
+#endif
+            size_t optvalsize = sizeof(optval);
+
+            rc = zmq_getsockopt (s, NUM2INT (option_), (void *)&optval,
+                                 &optvalsize);
+
+            if (rc != 0) {
+              rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
+              return Qnil;
+            }
+
+            if (NUM2INT (option_) == ZMQ_RCVMORE)
+                retval = optval ? Qtrue : Qfalse;
+            else
+                retval = INT2NUM (optval);
+        }
+        break;
+	case ZMQ_EVENTS:
+        {
+            uint32_t optval;
+            size_t optvalsize = sizeof(optval);
+
+            rc = zmq_getsockopt (s, NUM2INT (option_), (void *)&optval,
+                                 &optvalsize);
+
+            if (rc != 0) {
+              rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
+              return Qnil;
+            }
+
+            if (NUM2INT (option_) == ZMQ_RCVMORE)
+                retval = optval ? Qtrue : Qfalse;
+            else
+                retval = INT2NUM (optval);
+        }
+        break;
+	case ZMQ_TYPE:
+	case ZMQ_LINGER:
+	case ZMQ_RECONNECT_IVL:
+	case ZMQ_BACKLOG:
+        {
+            int optval;
+            size_t optvalsize = sizeof(optval);
+
+            rc = zmq_getsockopt (s, NUM2INT (option_), (void *)&optval,
+                                 &optvalsize);
+
+            if (rc != 0) {
+              rb_raise (rb_eRuntimeError, "%s", zmq_strerror (zmq_errno ()));
+              return Qnil;
+            }
+
+            if (NUM2INT (option_) == ZMQ_RCVMORE)
+                retval = optval ? Qtrue : Qfalse;
+            else
+                retval = INT2NUM (optval);
+        }
+        break;
+#endif
         {
             int64_t optval;
             size_t optvalsize = sizeof(optval);
@@ -1003,6 +1172,56 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
  * [Default value] 0
  * [Applicable socket types] all
  *
+ * == ZMQ::LINGER: Set linger period for socket shutdown
+ * The ZMQ::LINGER option shall set the linger period for the specified
+ * socket. The linger period determines how long pending messages which have
+ * yet to be sent to a peer shall linger in memory after a socket is closed
+ * with ZMQ::Socket#close(), and further affects the termination of the
+ * socket’s context with ZMQ#close(). The following outlines the different
+ * behaviours:
+ *
+ * * The default value of −1 specifies an infinite linger period.
+ *   Pending messages shall not be discarded after a call to ZMQ::Socket#close();
+ *   attempting to terminate the socket’s context with ZMQ::Context#close() shall block
+ *   until all pending messages have been sent to a peer.
+ *
+ * * The value of 0 specifies no linger period. Pending messages shall be
+ *   discarded immediately when the socket is closed with ZMQ::Socket#close.
+ *
+ * * Positive values specify an upper bound for the linger period in
+ *   milliseconds. Pending messages shall not be discarded after a call to
+ *   ZMQ::Socket#close(); attempting to terminate the socket’s context with
+ *   ZMQ::Context#close() shall block until either all pending messages have been sent
+ *   to a peer, or the linger period expires, after which any pending messages
+ *   shall be discarded.
+ *
+ * [Option value type] Integer
+ * [Option value unit] milliseconds
+ * [Default value] -1 (infinite)
+ * [Applicable socket types] all
+ *
+ * == ZMQ::RECONNECT_IVL: Set reconnection interval
+ * The ZMQ::RECONNECT_IVL option shall set the reconnection interval for
+ * the specified socket. The reconnection interval is the maximum period 0MQ
+ * shall wait between attempts to reconnect disconnected peers when using
+ * connection−oriented transports.
+ *
+ * [Option value type] Integer
+ * [Option value unit] milliseconds
+ * [Default value] 100
+ * [Applicable socket types] all, only for connection-oriented transports
+ *
+ * == ZMQ::BACKLOG: Set maximum length of the queue of outstanding connections
+ * The ZMQ::BACKLOG option shall set the maximum length of the queue of
+ * outstanding peer connections for the specified socket; this only applies to
+ * connection−oriented transports. For details refer to your operating system
+ * documentation for the listen function.
+ *
+ * [Option value type] Integer
+ * [Option value unit] connections
+ * [Default value] 100
+ * [Applicable socket types] all, only for connection-oriented transports
+ *
  */
 static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     VALUE optval_)
@@ -1023,14 +1242,28 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     case ZMQ_MCAST_LOOP:
     case ZMQ_SNDBUF:
     case ZMQ_RCVBUF:
+	    {
+	        uint64_t optval = FIX2LONG (optval_);
+
+	        //  Forward the code to native 0MQ library.
+	        rc = zmq_setsockopt (s, NUM2INT (option_),
+	            (void*) &optval, sizeof (optval));
+	    }
+	    break;
+
+#if ZMQ_VERSION >= 20100
+	case ZMQ_LINGER:
+	case ZMQ_RECONNECT_IVL:
+	case ZMQ_BACKLOG:
         {
-            uint64_t optval = FIX2LONG (optval_);
+            int optval = FIX2LONG (optval_);
 
             //  Forward the code to native 0MQ library.
             rc = zmq_setsockopt (s, NUM2INT (option_),
                 (void*) &optval, sizeof (optval));
         }
         break;
+#endif
 
     case ZMQ_IDENTITY:
     case ZMQ_SUBSCRIBE:
@@ -1332,12 +1565,12 @@ static VALUE socket_recv (int argc_, VALUE* argv_, VALUE self_)
  * call-seq:
  *   socket.close() -> nil
  *
- * Destroys the 0MQ socket.  All active connections on the socket shall be
- * terminated, and resources associated with the socket shall be released.
- * Any outstanding messages sent with send() but not yet physically sent
- * to the network shall be dropped.  Likewise, any outstanding messages
- * physically received from the network but not yet received by the
- * application with recv() shall also be dropped.
+ * Destroys the 0MQ socket.  Any outstanding messages physically received from
+ * the network but not yet received by the application with ZMQ::Socket#recv()
+ * shall be discarded. The behaviour for discarding messages sent by the
+ * application with ZMQ::Socket#send() but not yet physically transferred to
+ * the network depends on the value of the ZMQ::LINGER socket option for the
+ * socket.
  */
 static VALUE socket_close (VALUE self_)
 {
@@ -1391,6 +1624,14 @@ void Init_zmq ()
     rb_define_const (zmq_module, "RCVBUF", INT2NUM (ZMQ_RCVBUF));
     rb_define_const (zmq_module, "SNDMORE", INT2NUM (ZMQ_SNDMORE));
     rb_define_const (zmq_module, "RCVMORE", INT2NUM (ZMQ_RCVMORE));
+#if ZMQ_VERSION >= 20100
+    rb_define_const (zmq_module, "FD", INT2NUM (ZMQ_FD));
+    rb_define_const (zmq_module, "EVENTS", INT2NUM (ZMQ_EVENTS));
+    rb_define_const (zmq_module, "TYPE", INT2NUM (ZMQ_TYPE));
+    rb_define_const (zmq_module, "LINGER", INT2NUM (ZMQ_LINGER));
+    rb_define_const (zmq_module, "RECONNECT_IVL", INT2NUM (ZMQ_RECONNECT_IVL));
+    rb_define_const (zmq_module, "BACKLOG", INT2NUM (ZMQ_BACKLOG));
+#endif
 
     rb_define_const (zmq_module, "NOBLOCK", INT2NUM (ZMQ_NOBLOCK));
 
@@ -1405,12 +1646,17 @@ void Init_zmq ()
 #ifdef ZMQ_PUSH
     rb_define_const (zmq_module, "PUSH", INT2NUM (ZMQ_PUSH));
     rb_define_const (zmq_module, "PULL", INT2NUM (ZMQ_PULL));
+
+    //  Deprecated
+    rb_define_const (zmq_module, "UPSTREAM", INT2NUM (ZMQ_PULL));
+    rb_define_const (zmq_module, "DOWNSTREAM", INT2NUM (ZMQ_PUSH));
 #else
     rb_define_const (zmq_module, "PUSH", INT2NUM (ZMQ_DOWNSTREAM));
     rb_define_const (zmq_module, "PULL", INT2NUM (ZMQ_UPSTREAM));
-#endif
 
-    //  Obsolete.
+    //  Deprecated
     rb_define_const (zmq_module, "UPSTREAM", INT2NUM (ZMQ_UPSTREAM));
     rb_define_const (zmq_module, "DOWNSTREAM", INT2NUM (ZMQ_DOWNSTREAM));
+#endif
+
 }
