@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name = 'zmq'
-  s.version = '2.1.0'
-  s.date = '2010-12-05'
+  s.version = '2.1.0.1'
+  s.date = '2010-12-15'
   s.authors = ['Martin Sustrik', 'Brian Buchanan']
   s.email = ['sustrik@250bpm.com', 'bwb@holo.org']
   s.description = 'This gem provides a Ruby API for the ZeroMQ messaging library.'

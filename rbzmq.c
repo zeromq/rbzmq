@@ -887,15 +887,6 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
     Check_Socket (s);
   
     switch (NUM2INT (option_)) {
-    case ZMQ_RCVMORE:
-    case ZMQ_HWM:
-    case ZMQ_SWAP:
-    case ZMQ_AFFINITY:
-    case ZMQ_RATE:
-    case ZMQ_RECOVERY_IVL:
-    case ZMQ_MCAST_LOOP:
-    case ZMQ_SNDBUF:
-    case ZMQ_RCVBUF:
 #if ZMQ_VERSION >= 20100
 	case ZMQ_FD:
         {
@@ -962,6 +953,15 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
         }
         break;
 #endif
+    case ZMQ_RCVMORE:
+    case ZMQ_HWM:
+    case ZMQ_SWAP:
+    case ZMQ_AFFINITY:
+    case ZMQ_RATE:
+    case ZMQ_RECOVERY_IVL:
+    case ZMQ_MCAST_LOOP:
+    case ZMQ_SNDBUF:
+    case ZMQ_RCVBUF:
         {
             int64_t optval;
             size_t optvalsize = sizeof(optval);
