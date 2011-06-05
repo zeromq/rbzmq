@@ -744,6 +744,22 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Default value] 10
  * [Applicable socket types] all, when using multicast transports
  *
+ * == ZMQ::RECOVERY_IVL_MSEC: Get multicast recovery interval in milliseconds
+ * The ZMQ::RECOVERY_IVL_MSEC option shall retrieve the recovery interval, in
+ * milliseconds (ms) for multicast transports using the specified socket. The
+ * recovery interval determines the maximum time in milliseconds that a receiver
+ * can be absent from a multicast group before unrecoverable data loss will occur.
+ *
+ * For backward compatibility, the default value of ZMQ::RECOVERY_IVL_MSEC is -1
+ * indicating that the recovery interval should be obtained from the
+ * ZMQ::RECOVERY_IVL option. However, if the ZMQ::RECOVERY_IVL_MSEC value is not
+ * zero, then it will take precedence, and be used.
+ *
+ * [Option value type] Integer
+ * [Option value unit] milliseconds
+ * [Default value] -1
+ * [Applicable socket types] all, when using multicast transports
+ *
  * == ZMQ::MCAST_LOOP: Control multicast loopback
  * The ZMQ::MCAST_LOOP option controls whether data sent via multicast transports
  * can also be received by the sending host via loopback. A value of zero
@@ -817,6 +833,22 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Option value type] Integer
  * [Option value unit] milliseconds
  * [Default value] 100
+ * [Applicable socket types] all, only for connection-oriented transports
+ *
+ * == ZMQ::RECONNECT_IVL_MAX: Retrieve maximum reconnection interval
+ * The ZMQ::RECONNECT_IVL_MAX option shall set the maximum reconnection interval
+ * for the specified socket. This is the maximum period ØMQ shall wait between
+ * attempts to reconnect. On each reconnect attempt, the previous interval
+ * shall be doubled untill ZMQ::RECONNECT_IVL_MAX is reached. This allows for
+ * exponential backoff strategy. Default value means no exponential backoff
+ * is performed and reconnect interval calculations are only based on
+ * ZMQ::RECONNECT_IVL.
+ *
+ * Values less than ZMQ::RECONNECT_IVL will be ignored.
+ *
+ * [Option value type] Integer
+ * [Option value unit] milliseconds
+ * [Default value] 0 (only use RECONNECT_IVL)
  * [Applicable socket types] all, only for connection-oriented transports
  *
  * == ZMQ::BACKLOG: Retrieve maximum length of the queue of outstanding connections
@@ -934,6 +966,10 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
 	case ZMQ_LINGER:
 	case ZMQ_RECONNECT_IVL:
 	case ZMQ_BACKLOG:
+#if ZMQ_VERSION >= 20101
+	case ZMQ_RECONNECT_IVL_MAX:
+	case ZMQ_RECOVERY_IVL_MSEC:
+#endif
         {
             int optval;
             size_t optvalsize = sizeof(optval);
@@ -1129,11 +1165,33 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
  * maximum time in seconds that a receiver can be absent from a multicast group
  * before unrecoverable data loss will occur.
  *
- * <b>Caution:</b> Exercise care when setting large recovery intervals as the data needed for recovery will be held in memory. For example, a 1 minute recovery interval at a data rate of 1Gbps requires a 7GB in-memory buffer.
+ * <bCaution:</b> Exercise care when setting large recovery intervals as the data
+ * needed for recovery will be held in memory. For example, a 1 minute recovery
+ * interval at a data rate of 1Gbps requires a 7GB in-memory buffer.
  *
  * [Option value type] Integer
  * [Option value unit] seconds
  * [Default value] 10
+ * [Applicable socket types] all, when using multicast transports
+ *
+ * == ZMQ::RECOVERY_IVL_MSEC: Set multicast recovery interval in milliseconds
+ * The ZMQ::RECOVERY_IVL_MSEC option shall set the recovery interval, specified
+ * in milliseconds (ms) for multicast transports using the specified socket. The
+ * recovery interval determines the maximum time in milliseconds that a receiver
+ * can be absent from a multicast group before unrecoverable data loss will occur.
+ *
+ * A non-zero value of the ZMQ::RECOVERY_IVL_MSEC option will take precedence over
+ * the ZMQ::RECOVERY_IVL option, but since the default for the
+ * ZMQ::RECOVERY_IVL_MSEC is -1, the default is to use the ZMQ::RECOVERY_IVL option
+ * value.
+ *
+ * <bCaution:</b> Exercise care when setting large recovery intervals as the data
+ * needed for recovery will be held in memory. For example, a 1 minute recovery
+ * interval at a data rate of 1Gbps requires a 7GB in-memory buffer.
+ *
+ * [Option value type] Integer
+ * [Option value unit] milliseconds
+ * [Default value] -1
  * [Applicable socket types] all, when using multicast transports
  *
  * == ZMQ::MCAST_LOOP: Control multicast loopback
@@ -1255,6 +1313,10 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
 	case ZMQ_LINGER:
 	case ZMQ_RECONNECT_IVL:
 	case ZMQ_BACKLOG:
+#if ZMQ_VERSION >= 20101
+    case ZMQ_RECONNECT_IVL_MAX:
+    case ZMQ_RECOVERY_IVL_MSEC:
+#endif
         {
             int optval = FIX2LONG (optval_);
 
@@ -1632,6 +1694,10 @@ void Init_zmq ()
     rb_define_const (zmq_module, "RECONNECT_IVL", INT2NUM (ZMQ_RECONNECT_IVL));
     rb_define_const (zmq_module, "BACKLOG", INT2NUM (ZMQ_BACKLOG));
 #endif
+#if ZMQ_VERSION >= 20101
+    rb_define_const (zmq_module, "RECONNECT_IVL_MAX", INT2NUM (ZMQ_RECONNECT_IVL_MAX));
+    rb_define_const (zmq_module, "RECOVERY_IVL_MSEC", INT2NUM (ZMQ_RECOVERY_IVL_MSEC));
+#endif
 
     rb_define_const (zmq_module, "NOBLOCK", INT2NUM (ZMQ_NOBLOCK));
 
@@ -1640,8 +1706,21 @@ void Init_zmq ()
     rb_define_const (zmq_module, "PUB", INT2NUM (ZMQ_PUB));
     rb_define_const (zmq_module, "REQ", INT2NUM (ZMQ_REQ));
     rb_define_const (zmq_module, "REP", INT2NUM (ZMQ_REP));
+#ifdef ZMQ_DEALER
+    rb_define_const (zmq_module, "XREQ", INT2NUM (ZMQ_DEALER));
+    rb_define_const (zmq_module, "XREP", INT2NUM (ZMQ_ROUTER));
+    
+    // Deprecated
+    rb_define_const (zmq_module, "DEALER", INT2NUM (ZMQ_DEALER));
+    rb_define_const (zmq_module, "ROUTER", INT2NUM (ZMQ_ROUTER));
+#else
+    rb_define_const (zmq_module, "DEALER", INT2NUM (ZMQ_XREQ));
+    rb_define_const (zmq_module, "ROUTER", INT2NUM (ZMQ_XREP));
+
+    // Deprecated
     rb_define_const (zmq_module, "XREQ", INT2NUM (ZMQ_XREQ));
     rb_define_const (zmq_module, "XREP", INT2NUM (ZMQ_XREP));
+#endif
 
 #ifdef ZMQ_PUSH
     rb_define_const (zmq_module, "PUSH", INT2NUM (ZMQ_PUSH));
