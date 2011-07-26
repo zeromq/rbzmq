@@ -356,7 +356,7 @@ static VALUE internal_select(VALUE argval)
 
 static VALUE module_select_internal(VALUE readset, VALUE writeset, VALUE errset, long timeout_usec)
 {
-    int nitems;
+    size_t nitems;
     struct select_arg arg;
 
     /* Conservative estimate for nitems before we traverse the lists. */
