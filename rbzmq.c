@@ -1314,7 +1314,7 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     case ZMQ_RECOVERY_IVL_MSEC:
 #endif
         {
-            int optval = FIX2LONG (optval_);
+            int optval = FIX2INT (optval_);
 
             //  Forward the code to native 0MQ library.
             rc = zmq_setsockopt (s, NUM2INT (option_),
