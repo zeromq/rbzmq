@@ -370,11 +370,7 @@ static VALUE module_select_internal(VALUE readset, VALUE writeset, VALUE errset,
     arg.errset = errset;
     arg.timeout_usec = timeout_usec;
 
-#ifdef HAVE_RUBY_INTERN_H
-    return rb_ensure(internal_select, (VALUE)&arg, (void (*)())ruby_xfree, (VALUE)arg.items);
-#else
     return rb_ensure(internal_select, (VALUE)&arg, (VALUE (*)())ruby_xfree, (VALUE)arg.items);
-#endif
 }
 
 /*
