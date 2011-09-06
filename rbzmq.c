@@ -1657,7 +1657,7 @@ void Init_zmq ()
     rb_define_singleton_method (zmq_module, "version", module_version, 0);
     rb_define_singleton_method (zmq_module, "select", module_select, -1);
 
-	exception_type = rb_define_class_under (zmq_module, "Error", rb_eRuntimeError );
+    exception_type = rb_define_class_under (zmq_module, "Error", rb_eRuntimeError );
 
     VALUE context_type = rb_define_class_under (zmq_module, "Context",
         rb_cObject);
