@@ -18,7 +18,18 @@
 
 require 'mkmf'
 dir_config('zmq')
-if have_library('zmq', 'zmq_init')
+
+def header?
+  have_header('zmq.h') ||
+    find_header('zmq.h', '/opt/local/include', '/usr/local/include', '/usr/include')
+end
+
+def library?
+  have_library('zmq', 'zmq_init') ||
+    find_library('zmq', 'zmq_init', '/opt/local/lib', '/usr/local/lib', '/usr/lib')
+end
+
+if header? && library?
   puts "Cool, I found your zmq install..."
   create_makefile("zmq")
 else
