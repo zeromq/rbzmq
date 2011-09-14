@@ -357,7 +357,7 @@ static VALUE internal_select(VALUE argval)
 
 static VALUE module_select_internal(VALUE readset, VALUE writeset, VALUE errset, long timeout_usec)
 {
-    int nitems;
+    size_t nitems;
     struct select_arg arg;
 
     /* Conservative estimate for nitems before we traverse the lists. */
@@ -371,11 +371,7 @@ static VALUE module_select_internal(VALUE readset, VALUE writeset, VALUE errset,
     arg.errset = errset;
     arg.timeout_usec = timeout_usec;
 
-#ifdef HAVE_RUBY_INTERN_H
-    return rb_ensure(internal_select, (VALUE)&arg, (void (*)())ruby_xfree, (VALUE)arg.items);
-#else
     return rb_ensure(internal_select, (VALUE)&arg, (VALUE (*)())ruby_xfree, (VALUE)arg.items);
-#endif
 }
 
 /*
@@ -1319,7 +1315,7 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     case ZMQ_RECOVERY_IVL_MSEC:
 #endif
         {
-            int optval = FIX2LONG (optval_);
+            int optval = FIX2INT (optval_);
 
             //  Forward the code to native 0MQ library.
             rc = zmq_setsockopt (s, NUM2INT (option_),
