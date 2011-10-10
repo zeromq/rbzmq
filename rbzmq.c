@@ -86,18 +86,62 @@ static VALUE module_version (VALUE self_)
     return rb_ary_new3 (3, INT2NUM (major), INT2NUM (minor), INT2NUM (patch));
 }
 
+
+struct elm {
+	void * sock;
+	struct elm * next;
+
+};
+
+typedef struct elm * list ;
+
+
+struct context {
+	void * ctx;
+	list sockets;
+};
+
+
+list insert(list l, void * sk){
+	list el=malloc(sizeof(struct elm));
+	el->next=l;
+	el->sock=sk;
+	return el;
+}
+
+void freeList(list l){
+	if(l==NULL) {return;}
+	list t=l->next;
+	free(l);
+	return freeList(t);	
+}
+
 /*
  * Document-class: ZMQ::Context
  *
  * ZeroMQ library context.
  */
 
-static void context_free (void *ctx)
+static void context_free (void *ct)
 {
-    if (ctx) {
-       int rc = zmq_term (ctx);
-       assert (rc == 0);
+    if (ct) {
+       struct context * cont=(struct context *)ct;
+       if(cont->ctx){
+	       list l=NULL;
+	       for(l=cont->sockets;l!=NULL;l=l->next){
+		        int zero=0 ;
+	       		zmq_setsockopt(l->sock,ZMQ_LINGER,&zero,sizeof(int)); //LINGER
+			zmq_close(l->sock);
+	       }
+
+           fprintf(stderr,"will term  \n");
+    	   int rc = zmq_term (cont->ctx);
+           fprintf(stderr,"termed %d \n",rc);
+	   assert (rc == 0);
+	   freeList(cont->sockets);
+	}
     }
+		       fprintf(stderr,"freed\n");
 }
 
 static VALUE context_alloc (VALUE class_)
@@ -129,7 +173,11 @@ static VALUE context_initialize (int argc_, VALUE* argv_, VALUE self_)
         return Qnil;
     }
 
-    DATA_PTR (self_) = (void*) ctx;
+    struct context * cont= malloc(sizeof(struct context));
+    cont->ctx=ctx;
+    cont->sockets=NULL;
+
+    DATA_PTR (self_) = cont;
     return self_;
 }
 
@@ -161,12 +209,13 @@ static VALUE context_close (VALUE self_)
 {
     void * ctx = NULL;
     Data_Get_Struct (self_, void, ctx);
-    
     if (ctx != NULL) {
-        int rc = zmq_term (ctx);
-        assert (rc == 0);
-
-        DATA_PTR (self_) = NULL;
+	struct context* cont=(struct context *) ctx;
+		if (cont->ctx){
+		        int rc = zmq_term (cont->ctx);
+		        assert (rc == 0);
+		        DATA_PTR (self_) = NULL;
+		}
     }
 
     return Qnil;
@@ -402,8 +451,8 @@ static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
 static void socket_free (void *s)
 {
     if (s) {
-       int rc = zmq_close (s);
-       assert (rc == 0);
+//       int rc = zmq_close (s);
+       //assert (rc == 0);
     }
 }
 
@@ -428,11 +477,14 @@ static VALUE context_socket (VALUE self_, VALUE type_)
 {
     void * c = NULL;
     Data_Get_Struct (self_, void, c);
-    void * s = zmq_socket (c, NUM2INT (type_));
+    struct context * cont = (struct context *)c;
+    void * s = zmq_socket (cont->ctx, NUM2INT (type_));
     if (!s) {
         rb_raise (exception_type, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
     }
+
+    cont->sockets=insert(cont->sockets,s);
 
     return Data_Wrap_Struct(socket_type, 0, socket_free, s);
 }
