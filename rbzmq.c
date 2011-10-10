@@ -90,7 +90,6 @@ static VALUE module_version (VALUE self_)
 struct elm {
 	void * sock;
 	struct elm * next;
-
 };
 
 typedef struct elm * list ;
@@ -101,12 +100,36 @@ struct context {
 	list sockets;
 };
 
+struct socket  {
+	void * handle;
+	struct context * context;
+};
 
 list insert(list l, void * sk){
 	list el=malloc(sizeof(struct elm));
 	el->next=l;
 	el->sock=sk;
 	return el;
+}
+
+list deleteSocket(list l, struct socket * sock){
+	if(l->sock==sock->handle){
+		list t=l->next;
+		free(l);
+		return t;
+	}else{
+		list li=l->next;
+		list prec=l;
+		do{
+			if(li->sock==sock->handle){
+				prec->next=li->next;
+				free(li);
+				break;
+			}
+		}while((li=li->next)!=NULL);
+	}
+
+	return l;
 }
 
 void freeList(list l){
@@ -134,14 +157,11 @@ static void context_free (void *ct)
 			zmq_close(l->sock);
 	       }
 
-           fprintf(stderr,"will term  \n");
     	   int rc = zmq_term (cont->ctx);
-           fprintf(stderr,"termed %d \n",rc);
 	   assert (rc == 0);
 	   freeList(cont->sockets);
 	}
     }
-		       fprintf(stderr,"freed\n");
 }
 
 static VALUE context_alloc (VALUE class_)
@@ -271,7 +291,11 @@ static VALUE poll_add_item(VALUE io_, void *ps_) {
     item->events = state->event;
 
     if (CLASS_OF (io_) == socket_type) {
-        item->socket = DATA_PTR (io_);
+        void * so;
+        void * s;
+        Data_Get_Struct (io_, void, so);
+        s=((struct socket *)so)->handle;
+        item->socket = s;
         item->fd = -1;
     }
     else {
@@ -451,8 +475,10 @@ static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
 static void socket_free (void *s)
 {
     if (s) {
-//       int rc = zmq_close (s);
-       //assert (rc == 0);
+       struct socket * sock=(struct socket *)s;
+       sock->context->sockets=deleteSocket(sock->context->sockets,sock);
+       int rc = zmq_close(sock->handle);
+       assert (rc == 0);
     }
 }
 
@@ -485,8 +511,11 @@ static VALUE context_socket (VALUE self_, VALUE type_)
     }
 
     cont->sockets=insert(cont->sockets,s);
+    struct socket * sock=malloc(sizeof(struct socket));
+    sock->context=cont;
+    sock->handle=s;
 
-    return Data_Wrap_Struct(socket_type, 0, socket_free, s);
+    return Data_Wrap_Struct(socket_type, 0, socket_free, sock);
 }
 
 /*
@@ -962,9 +991,11 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
 {
     int rc = 0;
     VALUE retval;
+    void * so;
     void * s;
     
-    Data_Get_Struct (self_, void, s);
+    Data_Get_Struct (self_, void, so);
+    s=((struct socket *)so)->handle;
     Check_Socket (s);
   
     switch (NUM2INT (option_)) {
@@ -1335,9 +1366,11 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
 {
 
     int rc = 0;
+    void * so;
     void * s;
 
-    Data_Get_Struct (self_, void, s);
+    Data_Get_Struct (self_, void, so);
+    s=((struct socket *)so)->handle;
     Check_Socket (s);
 
     switch (NUM2INT (option_)) {
@@ -1424,8 +1457,10 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
  */
 static VALUE socket_bind (VALUE self_, VALUE addr_)
 {
+    void * so;
     void * s;
-    Data_Get_Struct (self_, void, s);
+    Data_Get_Struct (self_, void, so);
+    s=((struct socket *)so)->handle;
     Check_Socket (s);
 
     int rc = zmq_bind (s, rb_string_value_cstr (&addr_));
@@ -1467,8 +1502,10 @@ static VALUE socket_bind (VALUE self_, VALUE addr_)
  */
 static VALUE socket_connect (VALUE self_, VALUE addr_)
 {
+    void * so;
     void * s;
-    Data_Get_Struct (self_, void, s);
+    Data_Get_Struct (self_, void, so);
+    s=((struct socket *)so)->handle;
     Check_Socket (s);
 
     int rc = zmq_connect (s, rb_string_value_cstr (&addr_));
@@ -1540,7 +1577,9 @@ static VALUE socket_send (int argc_, VALUE* argv_, VALUE self_)
     rb_scan_args (argc_, argv_, "11", &msg_, &flags_);
 
     void * s;
-    Data_Get_Struct (self_, void, s);
+    void * so;
+    Data_Get_Struct (self_, void, so);
+    s=((struct socket *)so)->handle;
     Check_Socket (s);
 
     Check_Type (msg_, T_STRING);
@@ -1629,8 +1668,10 @@ static VALUE socket_recv (int argc_, VALUE* argv_, VALUE self_)
     
     rb_scan_args (argc_, argv_, "01", &flags_);
 
+    void * so;
     void * s;
-    Data_Get_Struct (self_, void, s);
+    Data_Get_Struct (self_, void, so);
+    s=((struct socket *)so)->handle;
     Check_Socket (s);
 
     int flags = NIL_P (flags_) ? 0 : NUM2INT (flags_);
@@ -1686,9 +1727,13 @@ static VALUE socket_recv (int argc_, VALUE* argv_, VALUE self_)
 static VALUE socket_close (VALUE self_)
 {
     void * s = NULL;
-    Data_Get_Struct (self_, void, s);
+    void * so = NULL;
+    Data_Get_Struct (self_, void, so);
+    s=((struct socket *)so)->handle;
     if (s != NULL) {
         int rc = zmq_close (s);
+	struct socket * sok=(struct socket *)so;
+	sok->context->sockets=deleteSocket(sok->context->sockets,sok);
         if (rc != 0) {
             rb_raise (exception_type, "%s", zmq_strerror (zmq_errno ()));
             return Qnil;
