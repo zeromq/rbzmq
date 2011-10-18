@@ -88,7 +88,7 @@ static VALUE module_version (VALUE self_)
 
 
 struct elm {
-	void * sock;
+	struct socket* sock;
 	struct elm * next;
 };
 
@@ -97,7 +97,7 @@ typedef struct elm * list ;
 
 struct context {
 	void * ctx;
-	list sockets;
+	list sockets; //opened sockets list
 };
 
 struct socket  {
@@ -105,15 +105,29 @@ struct socket  {
 	struct context * context;
 };
 
-list insert(list l, void * sk){
+list insert(list l, struct socket * sk){
 	list el=malloc(sizeof(struct elm));
 	el->next=l;
 	el->sock=sk;
 	return el;
 }
 
+int in_list(list l, struct socket * sock){
+
+	while(l!=NULL){
+		if(l->sock==sock){return 0;}
+		l=l->next;
+	}
+	return -1;
+}
+
+
+/*
+ * Removes a socket from list
+ */
 list deleteSocket(list l, struct socket * sock){
-	if(l->sock==sock->handle){
+	if(l==NULL){return NULL;}
+	if(l->sock==sock){
 		list t=l->next;
 		free(l);
 		return t;
@@ -121,7 +135,7 @@ list deleteSocket(list l, struct socket * sock){
 		list li=l->next;
 		list prec=l;
 		do{
-			if(li->sock==sock->handle){
+			if(li->sock==sock){
 				prec->next=li->next;
 				free(li);
 				break;
@@ -131,7 +145,9 @@ list deleteSocket(list l, struct socket * sock){
 
 	return l;
 }
-
+/*
+ * Free the list and its elements
+ */
 void freeList(list l){
 	if(l==NULL) {return;}
 	list t=l->next;
@@ -153,14 +169,16 @@ static void context_free (void *ct)
 	       list l=NULL;
 	       for(l=cont->sockets;l!=NULL;l=l->next){
 		        int zero=0 ;
-	       		zmq_setsockopt(l->sock,ZMQ_LINGER,&zero,sizeof(int)); //LINGER
-			zmq_close(l->sock);
+			zmq_setsockopt(l->sock->handle,ZMQ_LINGER,&zero,sizeof(int));
+			zmq_close(l->sock->handle);
 	       }
-
-    	   int rc = zmq_term (cont->ctx);
-	   assert (rc == 0);
 	   freeList(cont->sockets);
+	   cont->sockets=NULL;
+
+//    	   int rc = zmq_term (cont->ctx);
+	   //assert (rc == 0);
 	}
+       free(cont);
     }
 }
 
@@ -475,10 +493,13 @@ static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
 static void socket_free (void *s)
 {
     if (s) {
-       struct socket * sock=(struct socket *)s;
-       sock->context->sockets=deleteSocket(sock->context->sockets,sock);
-       int rc = zmq_close(sock->handle);
-       assert (rc == 0);
+	    struct socket * sock=(struct socket *)s;
+	    //if socket is not closed close it first
+	    if(in_list(sock->context->sockets,sock)==0){
+		    zmq_close(sock->handle);
+		    sock->context->sockets=deleteSocket(sock->context->sockets,sock);
+	    }
+       free(sock);
     }
 }
 
@@ -510,10 +531,10 @@ static VALUE context_socket (VALUE self_, VALUE type_)
         return Qnil;
     }
 
-    cont->sockets=insert(cont->sockets,s);
     struct socket * sock=malloc(sizeof(struct socket));
     sock->context=cont;
     sock->handle=s;
+    cont->sockets=insert(cont->sockets,sock);
 
     return Data_Wrap_Struct(socket_type, 0, socket_free, sock);
 }
