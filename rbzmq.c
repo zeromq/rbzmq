@@ -1496,12 +1496,13 @@ static VALUE socket_send (int argc_, VALUE* argv_, VALUE self_)
     int flags = NIL_P (flags_) ? 0 : NUM2INT (flags_);
 
     zmq_msg_t msg;
-    int rc = zmq_msg_init_size (&msg, RSTRING_LEN (msg_));
+    int msg_len = RSTRING_LEN (msg_);
+    int rc = zmq_msg_init_size (&msg, msg_len);
     if (rc != 0) {
         rb_raise (exception_type, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
     }
-    memcpy (zmq_msg_data (&msg), RSTRING_PTR (msg_), RSTRING_LEN (msg_));
+    memcpy (zmq_msg_data (&msg), RSTRING_PTR (msg_), msg_len);
 
 #ifdef HAVE_RUBY_INTERN_H
     if (!(flags & ZMQ_NOBLOCK)) {
