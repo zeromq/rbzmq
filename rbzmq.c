@@ -64,6 +64,9 @@ typedef unsigned __int64 uint64_t;
 
 VALUE socket_type;
 VALUE exception_type;
+/* Forward declarations */
+static VALUE context_close (VALUE);
+static VALUE socket_close (VALUE);
 
 /*
  * Document-class: ZMQ
