@@ -130,6 +130,9 @@ static VALUE context_initialize (int argc_, VALUE* argv_, VALUE self_)
     }
 
     DATA_PTR (self_) = (void*) ctx;
+    if (rb_block_given_p()) {
+        return rb_ensure(rb_yield, self_, context_close, self_);
+    }
     return self_;
 }
 
@@ -427,6 +430,7 @@ static void socket_free (void *s)
 static VALUE context_socket (VALUE self_, VALUE type_)
 {
     void * c = NULL;
+    VALUE rval;
     Data_Get_Struct (self_, void, c);
     void * s = zmq_socket (c, NUM2INT (type_));
     if (!s) {
@@ -434,7 +438,11 @@ static VALUE context_socket (VALUE self_, VALUE type_)
         return Qnil;
     }
 
-    return Data_Wrap_Struct(socket_type, 0, socket_free, s);
+    rval = Data_Wrap_Struct(socket_type, 0, socket_free, s);
+    if (rb_block_given_p()) {
+        return rb_ensure(rb_yield, rval, socket_close, rval);
+    }
+    return rval;
 }
 
 /*
