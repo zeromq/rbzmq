@@ -64,6 +64,9 @@ typedef unsigned __int64 uint64_t;
 
 VALUE socket_type;
 VALUE exception_type;
+/* Forward declarations */
+static VALUE context_close (VALUE);
+static VALUE socket_close (VALUE);
 
 /*
  * Document-class: ZMQ
@@ -109,12 +112,17 @@ static VALUE context_alloc (VALUE class_)
  * Document-method: new
  *
  * call-seq:
- *   new(io_threads=1)
+ *   new(io_threads=1) -> context
+ *   new(io_threads=1) {|context| block } -> obj
  *
  * Initializes a new 0MQ context. The io_threads argument specifies the size
  * of the 0MQ thread pool to handle I/O operations. If your application is
  * using only the _inproc_ transport for you may set this to zero; otherwise,
  * set it to at least one.
+ *
+ * If the optional block is given, it will be called with the context and the
+ * context will be closed upon exit with the block's value returned.
+ * Otherwise, the newly constructed context object itself is returned.
  */
 
 static VALUE context_initialize (int argc_, VALUE* argv_, VALUE self_)
@@ -130,6 +138,9 @@ static VALUE context_initialize (int argc_, VALUE* argv_, VALUE self_)
     }
 
     DATA_PTR (self_) = (void*) ctx;
+    if (rb_block_given_p()) {
+        return rb_ensure(rb_yield, self_, context_close, self_);
+    }
     return self_;
 }
 
@@ -411,7 +422,8 @@ static void socket_free (void *s)
  * Document-method: socket
  *
  * call-seq:
- *   zmq.socket(socket_type)
+ *   zmq.socket(socket_type) -> socket
+ *   zmq.socket(socket_type) {|socket| block} -> object
  *
  * Creates a new 0MQ socket.  The socket_type argument specifies the socket
  * type, which determines the semantics of communication over the socket.
@@ -422,11 +434,16 @@ static void socket_free (void *s)
  * endpoint must be created for accepting incoming connections with
  * bind().
  *
+ * If the optional block is given, it will be called with the socket as a
+ * parameter, and the socket will be closed upon exit from the block with
+ * the block's value returned.
+ *
  * For a description of the various socket types, see ZMQ::Socket.
  */
 static VALUE context_socket (VALUE self_, VALUE type_)
 {
     void * c = NULL;
+    VALUE rval;
     Data_Get_Struct (self_, void, c);
     void * s = zmq_socket (c, NUM2INT (type_));
     if (!s) {
@@ -434,7 +451,11 @@ static VALUE context_socket (VALUE self_, VALUE type_)
         return Qnil;
     }
 
-    return Data_Wrap_Struct(socket_type, 0, socket_free, s);
+    rval = Data_Wrap_Struct(socket_type, 0, socket_free, s);
+    if (rb_block_given_p()) {
+        return rb_ensure(rb_yield, rval, socket_close, rval);
+    }
+    return rval;
 }
 
 /*

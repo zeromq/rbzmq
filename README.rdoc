@@ -27,6 +27,19 @@ with patterns like fanout, pubsub, task distribution, and request-reply.
     break if data == "QUIT"
   end
 
+== Example 2
+  require 'zmq'
+
+  ZMQ::Context.new do |ctx|
+    ctx.socket(ZMQ::SUB) do |sock|
+      sock.bind('ipc:///tmp/zmq.1')
+      sock.setsockopt(ZMQ::SUBSCRIBE, 'sample')
+      loop do
+        msg = sock.recv
+        puts msg
+      end
+    end
+  end
 == License
 
 Copyright (c) 2007-2010 iMatix Corporation
