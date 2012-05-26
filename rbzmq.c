@@ -1175,7 +1175,7 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
  * [Default value] nil
  * [Applicable socket types] all
  *
- * ZMQ::SUBSCRIBE: Establish message filter
+ * == ZMQ::SUBSCRIBE: Establish message filter
  * The ZMQ::SUBSCRIBE option shall establish a new message filter on a ZMQ::SUB
  * socket. Newly created ZMQ::SUB sockets shall filter out all incoming messages,
  * therefore you should call this option to establish an initial message filter.
