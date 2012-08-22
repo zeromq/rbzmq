@@ -1570,7 +1570,16 @@ static VALUE socket_send (int argc_, VALUE* argv_, VALUE self_)
     }
     else
 #endif
-        rc = zmq_send (s->socket, &msg, flags);
+
+     // When system call is interrupted, try up to 5 times
+     int loop_count = 0;
+     do {
+          loop_count++;
+          if (loop_count>5)
+             rb_raise (exception_type, "Loop count limit exceeded: %s", zmq_strerror (zmq_errno ()));
+          rc = zmq_send(s, &msg, flags);
+     } while ((rc != 0) && (zmq_errno() == EINTR));
+
     if (rc != 0 && zmq_errno () == EAGAIN) {
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
