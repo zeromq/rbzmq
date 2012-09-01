@@ -960,6 +960,32 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Default value] N/A
  * [Applicable socket types] all
  *
+ * == ZMQ::SNDTIMEO
+ * Retrieves the timeout for send operations on the socket.
+ *
+ * If the value is 0, a send operation on the socket will return immediately, with a
+ * EAGAIN error if the message cannot be sent. If the value is -1, it will block until the
+ * message is sent. For all other values, it will try to send the message for that amount
+ * of time before returning with an EAGAIN error.
+ *
+ * [Option value type] Integer
+ * [Option value unit] milliseconds
+ * [Default value] -1 (infinite)
+ * [Applicable socket types] all
+ *
+ * == ZMQ::RCVTIMEO
+ * Retrieves the timeout for receive operations on the socket.
+ *
+ * If the value is 0, a receive operation on the socket will return immediately, with a
+ * EAGAIN error if there is no message to receive. If the value is -1, it will block until
+ * a message is available. For all other values, it will wait for a message for that
+ * amount of time before returning with an EAGAIN error.
+ *
+ * [Option value type] Integer
+ * [Option value unit] milliseconds
+ * [Default value] -1 (infinite)
+ * [Applicable socket types] all
+ *
  */
 static VALUE socket_getsockopt (VALUE self_, VALUE option_)
 {
@@ -1021,6 +1047,10 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
 #if ZMQ_VERSION >= 20101
 	case ZMQ_RECONNECT_IVL_MAX:
 	case ZMQ_RECOVERY_IVL_MSEC:
+#endif
+#if ZMQ_VERSION >= 20200
+        case ZMQ_SNDTIMEO:
+        case ZMQ_RCVTIMEO:
 #endif
         {
             int optval;
@@ -1332,6 +1362,32 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
  * [Default value] 100
  * [Applicable socket types] all, only for connection-oriented transports
  *
+ * == ZMQ::SNDTIMEO
+ * Sets the timeout for send operations on the socket.
+ *
+ * If the value is 0, a send operation on the socket will return immediately, with a
+ * EAGAIN error if the message cannot be sent. If the value is -1, it will block until the
+ * message is sent. For all other values, it will try to send the message for that amount
+ * of time before returning with an EAGAIN error.
+ *
+ * [Option value type] Integer
+ * [Option value unit] milliseconds
+ * [Default value] -1 (infinite)
+ * [Applicable socket types] all
+ *
+ * == ZMQ::RCVTIMEO
+ * Sets the timeout for receive operations on the socket.
+ *
+ * If the value is 0, a receive operation on the socket will return immediately, with a
+ * EAGAIN error if there is no message to receive. If the value is -1, it will block until
+ * a message is available. For all other values, it will wait for a message for that
+ * amount of time before returning with an EAGAIN error.
+ *
+ * [Option value type] Integer
+ * [Option value unit] milliseconds
+ * [Default value] -1 (infinite)
+ * [Applicable socket types] all
+ *
  */
 static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     VALUE optval_)
@@ -1368,6 +1424,10 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
 #if ZMQ_VERSION >= 20101
     case ZMQ_RECONNECT_IVL_MAX:
     case ZMQ_RECOVERY_IVL_MSEC:
+#endif
+#if ZMQ_VERSION >= 20200
+    case ZMQ_SNDTIMEO:
+    case ZMQ_RCVTIMEO:
 #endif
         {
             int optval = FIX2INT (optval_);
@@ -1756,6 +1816,10 @@ void Init_zmq ()
 #if ZMQ_VERSION >= 20101
     rb_define_const (zmq_module, "RECONNECT_IVL_MAX", INT2NUM (ZMQ_RECONNECT_IVL_MAX));
     rb_define_const (zmq_module, "RECOVERY_IVL_MSEC", INT2NUM (ZMQ_RECOVERY_IVL_MSEC));
+#endif
+#if ZMQ_VERSION >= 20200
+    rb_define_const (zmq_module, "SNDTIMEO", INT2NUM (ZMQ_SNDTIMEO));
+    rb_define_const (zmq_module, "RCVTIMEO", INT2NUM (ZMQ_RCVTIMEO));
 #endif
 
     rb_define_const (zmq_module, "NOBLOCK", INT2NUM (ZMQ_NOBLOCK));
