@@ -58,7 +58,21 @@ typedef unsigned __int64 uint64_t;
 
 /* 0MQ 2.x / 3.x compatibility */
 #ifndef ZMQ_DONTWAIT
-#  define ZMQ_DONTWAIT ZMQ_NOBLOCK
+#   define ZMQ_DONTWAIT   ZMQ_NOBLOCK
+#endif
+#ifndef ZMQ_RCVHWM
+#   define ZMQ_RCVHWM     ZMQ_HWM
+#endif
+#ifndef ZMQ_SNDHWM
+#   define ZMQ_SNDHWM     ZMQ_HWM
+#endif
+#if ZMQ_VERSION_MAJOR == 2
+#   define zmq_ctx_destroy(context) zmq_term(context)
+#   define zmq_msg_send(msg,sock,opt) zmq_send(sock, msg, opt)
+#   define zmq_msg_recv(msg,sock,opt) zmq_recv(sock, msg, opt)
+#   define ZMQ_POLL_MSEC    1000        //  zmq_poll is usec
+#elif ZMQ_VERSION_MAJOR == 3
+#   define ZMQ_POLL_MSEC    1           //  zmq_poll is msec
 #endif
 
 struct zmq_context {
@@ -116,7 +130,7 @@ static void context_free (void *ptr)
 
     if (ctx->refs == 0) {
         if (ctx->context != NULL) {
-            int rc = zmq_term(ctx->context);
+            int rc = zmq_ctx_destroy(ctx->context);
             assert (rc == 0);
         }
 
@@ -179,7 +193,7 @@ static VALUE context_initialize (int argc_, VALUE* argv_, VALUE self_)
  *    ETERM. With the exception of ZMQ::Socket#close(), any further operations on
  *    sockets open within context shall fail with an error code of ETERM.
  *
- * 2. After interrupting all blocking calls, zmq_term() shall block until
+ * 2. After interrupting all blocking calls, ZMQ::Context#close() shall block until
  *    the following conditions are satisfied:
  *    * All sockets open within context have been closed with ZMQ::Socket#close().
  *    * For each socket within context, all messages sent by the
@@ -196,7 +210,7 @@ static VALUE context_close (VALUE self_)
     Data_Get_Struct (self_, void, ctx);
     
     if (ctx->context != NULL) {
-        int rc = zmq_term(ctx->context);
+        int rc = zmq_ctx_destroy(ctx->context);
         assert (rc == 0);
 
         ctx->context = NULL;
@@ -297,7 +311,7 @@ static VALUE poll_add_item(VALUE io_, void *ps_) {
 struct zmq_poll_args {
     zmq_pollitem_t *items;
     int nitems;
-    long timeout_usec;
+    long timeout_msec;
     int rc;
 };
 
@@ -305,7 +319,7 @@ static VALUE zmq_poll_blocking (void* args_)
 {
     struct zmq_poll_args *poll_args = (struct zmq_poll_args *)args_;
     
-    poll_args->rc = zmq_poll (poll_args->items, poll_args->nitems, poll_args->timeout_usec);
+    poll_args->rc = zmq_poll (poll_args->items, poll_args->nitems, poll_args->timeout_msec * ZMQ_POLL_MSEC);
     
     return Qnil;
 }
@@ -316,7 +330,7 @@ struct select_arg {
     VALUE readset;
     VALUE writeset;
     VALUE errset;
-    long timeout_usec;
+    long timeout_msec;
     zmq_pollitem_t *items;
 };
 
@@ -351,18 +365,18 @@ static VALUE internal_select(VALUE argval)
     nitems = ps.nitems;
 
 #ifdef HAVE_RUBY_INTERN_H
-    if (arg->timeout_usec != 0) {
+    if (arg->timeout_msec != 0) {
         struct zmq_poll_args poll_args;
         poll_args.items = ps.items;
         poll_args.nitems = ps.nitems;
-        poll_args.timeout_usec = arg->timeout_usec;
+        poll_args.timeout_msec = arg->timeout_msec;
 
         rb_thread_blocking_region (zmq_poll_blocking, (void*)&poll_args, NULL, NULL);
         rc = poll_args.rc;
     }
     else
 #endif
-        rc = zmq_poll (ps.items, ps.nitems, arg->timeout_usec);
+        rc = zmq_poll (ps.items, ps.nitems, arg->timeout_msec * ZMQ_POLL_MSEC);
     
     if (rc == -1) {
         rb_raise(exception_type, "%s", zmq_strerror (zmq_errno ()));
@@ -391,7 +405,7 @@ static VALUE internal_select(VALUE argval)
     return rb_ary_new3 (3, read_active, write_active, err_active);
 }
 
-static VALUE module_select_internal(VALUE readset, VALUE writeset, VALUE errset, long timeout_usec)
+static VALUE module_select_internal(VALUE readset, VALUE writeset, VALUE errset, long timeout_msec)
 {
     size_t nitems;
     struct select_arg arg;
@@ -405,7 +419,7 @@ static VALUE module_select_internal(VALUE readset, VALUE writeset, VALUE errset,
     arg.readset = readset;
     arg.writeset = writeset;
     arg.errset = errset;
-    arg.timeout_usec = timeout_usec;
+    arg.timeout_msec = timeout_msec;
 
     return rb_ensure(internal_select, (VALUE)&arg, (VALUE (*)())xfree, (VALUE)arg.items);
 }
@@ -421,18 +435,18 @@ static VALUE module_select (int argc_, VALUE* argv_, VALUE self_)
     VALUE readset, writeset, errset, timeout;
     rb_scan_args (argc_, argv_, "13", &readset, &writeset, &errset, &timeout);
 
-    long timeout_usec;
+    long timeout_msec;
 
     if (!NIL_P (readset)) Check_Type (readset, T_ARRAY);
     if (!NIL_P (writeset)) Check_Type (writeset, T_ARRAY);
     if (!NIL_P (errset)) Check_Type (errset, T_ARRAY);
     
     if (NIL_P (timeout))
-        timeout_usec = -1;
+        timeout_msec = -1;
     else
-        timeout_usec = (long)(NUM2DBL (timeout) * 1000000);
+        timeout_msec = (long)(NUM2DBL (timeout) * 1000);
 
-    return module_select_internal(readset, writeset, errset, timeout_usec);
+    return module_select_internal(readset, writeset, errset, timeout_msec);
 }
 
 static void socket_free (void *ptr)
@@ -1661,7 +1675,7 @@ static VALUE zmq_send_blocking (void* args_)
 {
     struct zmq_send_recv_args *send_args = (struct zmq_send_recv_args *)args_;
 
-    send_args->rc = zmq_send(send_args->socket, send_args->msg, send_args->flags);
+    send_args->rc = zmq_msg_send(send_args->socket, send_args->msg, send_args->flags);
     
     return Qnil;
 }
@@ -1736,14 +1750,14 @@ static VALUE socket_send (int argc_, VALUE* argv_, VALUE self_)
     }
     else
 #endif
-        rc = zmq_send (s->socket, &msg, flags);
-    if (rc != 0 && zmq_errno () == EAGAIN) {
+        rc = zmq_msg_send (s->socket, &msg, flags);
+    if (rc == -1 && zmq_errno () == EAGAIN) {
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
         return Qfalse;
     }
 
-    if (rc != 0) {
+    if (rc == -1) {
         rb_raise (exception_type, "%s", zmq_strerror (zmq_errno ()));
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
@@ -1760,7 +1774,7 @@ static VALUE zmq_recv_blocking (void* args_)
 {
     struct zmq_send_recv_args *recv_args = (struct zmq_send_recv_args *)args_;
 
-    recv_args->rc = zmq_recv(recv_args->socket, recv_args->msg, recv_args->flags);
+    recv_args->rc = zmq_msg_recv(recv_args->socket, recv_args->msg, recv_args->flags);
     
     return Qnil;
 }
@@ -1821,14 +1835,14 @@ static VALUE socket_recv (int argc_, VALUE* argv_, VALUE self_)
     }
     else
 #endif
-        rc = zmq_recv (s->socket, &msg, flags);
-    if (rc != 0 && zmq_errno () == EAGAIN) {
+        rc = zmq_msg_recv (s->socket, &msg, flags);
+    if (rc == -1 && zmq_errno () == EAGAIN) {
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
         return Qnil;
     }
 
-    if (rc != 0) {
+    if (rc == -1) {
         rb_raise (exception_type, "%s", zmq_strerror (zmq_errno ()));
         rc = zmq_msg_close (&msg);
         assert (rc == 0);
