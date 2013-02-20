@@ -1049,8 +1049,8 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
 	case ZMQ_RECOVERY_IVL_MSEC:
 #endif
 #if ZMQ_VERSION >= 20200
-        case ZMQ_SNDTIMEO:
-        case ZMQ_RCVTIMEO:
+  case ZMQ_SNDTIMEO:
+  case ZMQ_RCVTIMEO:
 #endif
         {
             int optval;
@@ -1418,9 +1418,9 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
 	    break;
 
 #if ZMQ_VERSION >= 20100
-	case ZMQ_LINGER:
-	case ZMQ_RECONNECT_IVL:
-	case ZMQ_BACKLOG:
+    case ZMQ_LINGER:
+    case ZMQ_RECONNECT_IVL:
+    case ZMQ_BACKLOG:
 #if ZMQ_VERSION >= 20101
     case ZMQ_RECONNECT_IVL_MAX:
     case ZMQ_RECOVERY_IVL_MSEC:
