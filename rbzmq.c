@@ -549,7 +549,7 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Send/receive pattern] Send, Receive, Send, Receive, ...
  * [Outgoing routing strategy] Load-balanced
  * [Incoming routing strategy] Last peer
- * [ZMQ::HWM option action] Block
+ * [ZMQ::SNDHWM option action] Block
  *
  * == ZMQ::REP
  * A socket of type ZMQ::REP is used by a _service_ to receive requests from and
@@ -568,7 +568,7 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Send/receive pattern] Receive, Send, Receive, Send, ...
  * [Incoming routing strategy] Fair-queued
  * [Outgoing routing stratagy] Last peer
- * [ZMQ::HWM option action] Drop
+ * [ZMQ::RCVHWM option action] Drop
  *
  *
  * = Publish-subscribe pattern
@@ -591,7 +591,7 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Send/receive pattern] Send only
  * [Incoming routing strategy] N/A
  * [Outgoing routing strategy] Fanout
- * [ZMQ::HWM option action] Drop
+ * [ZMQ::SNDHWM option action] Drop
  *
  * == ZMQ::SUB
  *
@@ -607,7 +607,7 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Send/receive pattern] Receive only
  * [Incoming routing strategy] Fair-queued
  * [Outgoing routing strategy] N/A
- * [ZMQ::HWM option action] N/A
+ * [ZMQ::RCVHWM option action] N/A
  *
  * = Pipeline pattern
  * The pipeline pattern is used for distributing data to _nodes_ arranged in a
@@ -634,7 +634,7 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Send/receive pattern] Send only
  * [Incoming routing strategy] N/A
  * [Outgoing routing strategy] Load-balanced
- * [ZMQ::HWM option action] Block
+ * [ZMQ::SNDHWM option action] Block
  *
  * == ZMQ::PULL
  *
@@ -649,7 +649,7 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Send/receive pattern] Receive only
  * [Incoming routing strategy] Fair-queued
  * [Outgoing routing strategy] N/A
- * [ZMQ::HWM option action] N/A
+ * [ZMQ::RCVHWM option action] N/A
  *
  * = Exclusive pair pattern
  *
@@ -676,7 +676,7 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Send/receive pattern] Unrestricted
  * [Incoming routing strategy] N/A
  * [Outcoming routing strategy] N/A
- * [ZMQ::HWM option action] Block
+ * [ZMQ::SNDHWM / ZMQ::RCVHWM option action] Block
  */
 
 /*
@@ -702,7 +702,45 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Default value] N/A
  * [Applicable socket types] all
  *
- * == ZMQ::HWM: Retrieve high water mark
+ * == ZMQ::SNDHWM: Retrieve high water mark
+ * The ZMQ::SNDHWM option shall retrieve the high water mark for the specified
+ * _socket_. The high water mark is a hard limit on the maximum number of
+ * outstanding messages 0MQ shall queue in memory for any single peer that the
+ * specified _socket_ is communicating with.
+ *
+ * If this limit has been reached the socket shall enter an exceptional state
+ * and depending on the socket type, 0MQ shall take appropriate action such as
+ * blocking or dropping sent messages. Refer to the individual socket
+ * descriptions in ZMQ::Socket for details on the exact action taken for each
+ * socket type.
+ *
+ * The default ZMQ::SNDHWM value of zero means "no limit".
+ *
+ * [Option value type] Integer
+ * [Option value unit] messages
+ * [Default value] 0
+ * [Applicable socket types] all
+ *
+ * == ZMQ::RCVHWM: Retrieve receive high water mark
+ * The ZMQ::RCVHWM option shall retrieve the high water mark for the specified
+ * _socket_. The high water mark is a hard limit on the maximum number of
+ * outstanding messages 0MQ shall queue in memory for any single peer that the
+ * specified _socket_ is communicating with.
+ *
+ * If this limit has been reached the socket shall enter an exceptional state
+ * and depending on the socket type, 0MQ shall take appropriate action such as
+ * blocking or dropping received messages. Refer to the individual socket
+ * descriptions in ZMQ::Socket for details on the exact action taken for each
+ * socket type.
+ *
+ * The default ZMQ::RCVHWM value of zero means "no limit".
+ *
+ * [Option value type] Integer
+ * [Option value unit] messages
+ * [Default value] 0
+ * [Applicable socket types] all
+ *
+ * == ZMQ::HWM: Retrieve high water mark (0MQ 2.x only)
  * The ZMQ::HWM option shall retrieve the high water mark for the specified
  * _socket_. The high water mark is a hard limit on the maximum number of
  * outstanding messages 0MQ shall queue in memory for any single peer that the
@@ -1053,6 +1091,8 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
   case ZMQ_RCVTIMEO:
 #endif
 #if ZMQ_VERSION >= 32000
+  case ZMQ_SNDHWM:
+  case ZMQ_RCVHWM:
   case ZMQ_RCVMORE:
   case ZMQ_RATE:
   case ZMQ_RECOVERY_IVL:
@@ -1078,12 +1118,12 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
         }
         break;
 #endif
-    case ZMQ_HWM:
 #ifdef ZMQ_SWAP
     case ZMQ_SWAP:
 #endif
     case ZMQ_AFFINITY:
 #if ZMQ_VERSION < 32000
+    case ZMQ_HWM:
     case ZMQ_RCVMORE:
     case ZMQ_RATE:
     case ZMQ_RECOVERY_IVL:
@@ -1144,7 +1184,45 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
  *
  * The following socket options can be set with the setsockopt() function:
  *
- * == ZMQ::HWM: Set high water mark
+ * == ZMQ::SNDHWM: Set send high water mark
+ * The ZMQ::SNDHWM option shall set the high water mark for the specified _socket_.
+ * The high water mark is a hard limit on the maximum number of outstanding
+ * messages 0MQ shall queue in memory for any single peer that the specified
+ * _socket_ is communicating with.
+ *
+ * If this limit has been reached the socket shall enter an exceptional state
+ * and depending on the socket type, 0MQ shall take appropriate action such as
+ * blocking or dropping sent messages. Refer to the individual socket
+ * descriptions in ZMQ::Socket for details on the exact action taken for each
+ * socket type.
+ *
+ * The default ZMQ::SNDHWM value of zero means "no limit".
+ *
+ * [Option value type] Integer
+ * [Option value unit] messages
+ * [Default value] 0
+ * [Applicable socket types] all
+ *
+ * == ZMQ::RCVHWM: Set receive high water mark
+ * The ZMQ::RCVHWM option shall set the high water mark for the specified _socket_.
+ * The high water mark is a hard limit on the maximum number of outstanding
+ * messages 0MQ shall queue in memory for any single peer that the specified
+ * _socket_ is communicating with.
+ *
+ * If this limit has been reached the socket shall enter an exceptional state
+ * and depending on the socket type, 0MQ shall take appropriate action such as
+ * blocking or dropping received messages. Refer to the individual socket
+ * descriptions in ZMQ::Socket for details on the exact action taken for each
+ * socket type.
+ *
+ * The default ZMQ::RCVHWM value of zero means "no limit".
+ *
+ * [Option value type] Integer
+ * [Option value unit] messages
+ * [Default value] 0
+ * [Applicable socket types] all
+ *
+ * == ZMQ::HWM: Set high water mark (0MQ 2.x only)
  * The ZMQ::HWM option shall set the high water mark for the specified _socket_.
  * The high water mark is a hard limit on the maximum number of outstanding
  * messages 0MQ shall queue in memory for any single peer that the specified
@@ -1411,12 +1489,12 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     Check_Socket (s);
 
     switch (NUM2INT (option_)) {
-    case ZMQ_HWM:
 #ifdef ZMQ_SWAP
     case ZMQ_SWAP:
 #endif
     case ZMQ_AFFINITY:
 #if ZMQ_VERSION < 32000
+    case ZMQ_HWM:
     case ZMQ_RATE:
     case ZMQ_RECOVERY_IVL:
     case ZMQ_MCAST_LOOP:
@@ -1445,6 +1523,8 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     case ZMQ_RCVTIMEO:
 #endif
 #if ZMQ_VERSION >= 32000
+    case ZMQ_SNDHWM:
+    case ZMQ_RCVHWM:
     case ZMQ_RATE:
     case ZMQ_RECOVERY_IVL:
     case ZMQ_SNDBUF:
@@ -1813,7 +1893,6 @@ void Init_zmq ()
     rb_define_method (socket_type, "recv", socket_recv, -1);
     rb_define_method (socket_type, "close", socket_close, 0);
 
-    rb_define_const (zmq_module, "HWM", INT2NUM (ZMQ_HWM));
 #ifdef ZMQ_SWAP
     rb_define_const (zmq_module, "SWAP", INT2NUM (ZMQ_SWAP));
 #endif
@@ -1825,6 +1904,10 @@ void Init_zmq ()
     rb_define_const (zmq_module, "RECOVERY_IVL", INT2NUM (ZMQ_RECOVERY_IVL));
 #if ZMQ_VERSION < 32000
     rb_define_const (zmq_module, "MCAST_LOOP", INT2NUM (ZMQ_MCAST_LOOP));
+    rb_define_const (zmq_module, "HWM", INT2NUM (ZMQ_HWM));
+#else
+    rb_define_const (zmq_module, "SNDHWM", INT2NUM (ZMQ_SNDHWM));
+    rb_define_const (zmq_module, "RCVHWM", INT2NUM (ZMQ_RCVHWM));
 #endif
     rb_define_const (zmq_module, "SNDBUF", INT2NUM (ZMQ_SNDBUF));
     rb_define_const (zmq_module, "RCVBUF", INT2NUM (ZMQ_RCVBUF));
