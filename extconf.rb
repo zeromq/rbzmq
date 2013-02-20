@@ -19,6 +19,9 @@
 require 'mkmf'
 dir_config('zmq')
 
+$CFLAGS += ' -std=c99'
+CONFIG['warnflags'].gsub!(/-Wdeclaration-after-statement|-Wunused-parameter/, '') if CONFIG['warnflags']
+
 def header?
   have_header('zmq.h') ||
     find_header('zmq.h', '/opt/local/include', '/usr/local/include', '/usr/include')
