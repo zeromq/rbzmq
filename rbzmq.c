@@ -56,6 +56,11 @@ typedef unsigned __int64 uint64_t;
 #include <stdint.h>
 #endif
 
+/* 0MQ 2.x / 3.x compatibility */
+#ifndef ZMQ_DONTWAIT
+#  define ZMQ_DONTWAIT ZMQ_NOBLOCK
+#endif
+
 struct zmq_context {
     void *context;
     unsigned refs;
@@ -1670,7 +1675,7 @@ static VALUE zmq_send_blocking (void* args_)
  * _socket_.  The _flags_ argument is a combination of the flags defined
  * below:
  *
- * [ZMQ::NOBLOCK] Specifies that the operation should be performed in
+ * [ZMQ::DONTWAIT] Specifies that the operation should be performed in
  * non-blocking mode. If the message cannot be queued on the _socket_,
  * the function shall fail and return _false_.
  * [ZMQ::SNDMORE] Specifies that the message being sent is a multi-part message,
@@ -1721,7 +1726,7 @@ static VALUE socket_send (int argc_, VALUE* argv_, VALUE self_)
     memcpy (zmq_msg_data (&msg), RSTRING_PTR (msg_), msg_len);
 
 #ifdef HAVE_RUBY_INTERN_H
-    if (!(flags & ZMQ_NOBLOCK)) {
+    if (!(flags & ZMQ_DONTWAIT)) {
         struct zmq_send_recv_args send_args;
         send_args.socket = s->socket;
         send_args.msg = &msg;
@@ -1770,7 +1775,7 @@ static VALUE zmq_recv_blocking (void* args_)
  * satisfied.  The _flags_ argument is a combination of the flags defined
  * below:
  *
- * [ZMQ::NOBLOCK] Specifies that the operation should be performed in
+ * [ZMQ::DONTWAIT] Specifies that the operation should be performed in
  * non-blocking mode.  If there are no messages available on the _socket_,
  * the recv() function shall fail and return _nil_.
  *
@@ -1805,7 +1810,7 @@ static VALUE socket_recv (int argc_, VALUE* argv_, VALUE self_)
     assert (rc == 0);
 
 #ifdef HAVE_RUBY_INTERN_H
-    if (!(flags & ZMQ_NOBLOCK)) {
+    if (!(flags & ZMQ_DONTWAIT)) {
         struct zmq_send_recv_args recv_args;
         recv_args.socket = s->socket;
         recv_args.msg = &msg;
@@ -1930,7 +1935,8 @@ void Init_zmq ()
     rb_define_const (zmq_module, "RCVTIMEO", INT2NUM (ZMQ_RCVTIMEO));
 #endif
 
-    rb_define_const (zmq_module, "NOBLOCK", INT2NUM (ZMQ_NOBLOCK));
+    rb_define_const (zmq_module, "NOBLOCK", INT2NUM (ZMQ_DONTWAIT));
+    rb_define_const (zmq_module, "DONTWAIT", INT2NUM (ZMQ_DONTWAIT));
 
     rb_define_const (zmq_module, "PAIR", INT2NUM (ZMQ_PAIR));
     rb_define_const (zmq_module, "SUB", INT2NUM (ZMQ_SUB));
