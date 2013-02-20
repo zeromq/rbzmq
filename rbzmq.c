@@ -721,7 +721,7 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Default value] 0
  * [Applicable socket types] all
  *
- * == ZMQ::SWAP: Retrieve disk offload size
+ * == ZMQ::SWAP: Retrieve disk offload size (0MQ 2.x only)
  * The ZMQ::SWAP option shall retrieve the disk offload (swap) size for the
  * specified _socket_. A socket which has ZMQ::SWAP set to a non-zero value may
  * exceed it’s high water mark; in this case outstanding messages shall be
@@ -1073,7 +1073,9 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
 #endif
     case ZMQ_RCVMORE:
     case ZMQ_HWM:
+#ifdef ZMQ_SWAP
     case ZMQ_SWAP:
+#endif
     case ZMQ_AFFINITY:
     case ZMQ_RATE:
     case ZMQ_RECOVERY_IVL:
@@ -1152,7 +1154,7 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
  * [Default value] 0
  * [Applicable socket types] all
  *
- * == ZMQ::SWAP: Set disk offload size
+ * == ZMQ::SWAP: Set disk offload size (0MQ 2.x only)
  * The ZMQ::SWAP option shall set the disk offload (swap) size for the specified
  * socket. A socket which has ZMQ::SWAP set to a non-zero value may exceed it’s
  * high water mark; in this case outstanding messages shall be offloaded to
@@ -1401,7 +1403,9 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
 
     switch (NUM2INT (option_)) {
     case ZMQ_HWM:
+#ifdef ZMQ_SWAP
     case ZMQ_SWAP:
+#endif
     case ZMQ_AFFINITY:
     case ZMQ_RATE:
     case ZMQ_RECOVERY_IVL:
@@ -1793,7 +1797,9 @@ void Init_zmq ()
     rb_define_method (socket_type, "close", socket_close, 0);
 
     rb_define_const (zmq_module, "HWM", INT2NUM (ZMQ_HWM));
+#ifdef ZMQ_SWAP
     rb_define_const (zmq_module, "SWAP", INT2NUM (ZMQ_SWAP));
+#endif
     rb_define_const (zmq_module, "AFFINITY", INT2NUM (ZMQ_AFFINITY));
     rb_define_const (zmq_module, "IDENTITY", INT2NUM (ZMQ_IDENTITY));
     rb_define_const (zmq_module, "SUBSCRIBE", INT2NUM (ZMQ_SUBSCRIBE));
