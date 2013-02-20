@@ -848,25 +848,9 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * determines the maximum time in seconds that a receiver can be absent from a
  * multicast group before unrecoverable data loss will occur.
  *
- * [Option value type] Integer
+ * [Option value type] Number
  * [Option value unit] seconds
  * [Default value] 10
- * [Applicable socket types] all, when using multicast transports
- *
- * == ZMQ::RECOVERY_IVL_MSEC: Get multicast recovery interval in milliseconds
- * The ZMQ::RECOVERY_IVL_MSEC option shall retrieve the recovery interval, in
- * milliseconds (ms) for multicast transports using the specified socket. The
- * recovery interval determines the maximum time in milliseconds that a receiver
- * can be absent from a multicast group before unrecoverable data loss will occur.
- *
- * For backward compatibility, the default value of ZMQ::RECOVERY_IVL_MSEC is -1
- * indicating that the recovery interval should be obtained from the
- * ZMQ::RECOVERY_IVL option. However, if the ZMQ::RECOVERY_IVL_MSEC value is not
- * zero, then it will take precedence, and be used.
- *
- * [Option value type] Integer
- * [Option value unit] milliseconds
- * [Default value] -1
  * [Applicable socket types] all, when using multicast transports
  *
  * == ZMQ::MCAST_LOOP: Control multicast loopback (0MQ 2.x only)
@@ -1103,7 +1087,9 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
 	case ZMQ_BACKLOG:
 #if ZMQ_VERSION >= 20101
 	case ZMQ_RECONNECT_IVL_MAX:
-	case ZMQ_RECOVERY_IVL_MSEC:
+#  if ZMQ_VERSION_MAJOR == 2
+  case ZMQ_RECOVERY_IVL_MSEC:
+#  endif
 #endif
 #if ZMQ_VERSION >= 20200
   case ZMQ_SNDTIMEO:
@@ -1119,10 +1105,11 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
   case ZMQ_RCVBUF:
 #endif
         {
+            int opt = FIX2INT(option_);
             int optval;
             size_t optvalsize = sizeof(optval);
 
-            rc = zmq_getsockopt (s->socket, NUM2INT (option_), (void *)&optval,
+            rc = zmq_getsockopt (s->socket, opt, (void *)&optval,
                                  &optvalsize);
 
             if (rc != 0) {
@@ -1130,10 +1117,18 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
               return Qnil;
             }
 
-            if (NUM2INT (option_) == ZMQ_RCVMORE)
+            switch (NUM2INT (option_)) {
+              case ZMQ_RCVMORE:
                 retval = optval ? Qtrue : Qfalse;
-            else
+                break;
+#if ZMQ_VERSION_MAJOR == 3
+              case ZMQ_RECOVERY_IVL:
+                retval = rb_float_new(optval / 1000.0);
+                break;
+#endif
+              default:
                 retval = INT2NUM (optval);
+            }
         }
         break;
 #endif
@@ -1359,29 +1354,9 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
  * needed for recovery will be held in memory. For example, a 1 minute recovery
  * interval at a data rate of 1Gbps requires a 7GB in-memory buffer.
  *
- * [Option value type] Integer
+ * [Option value type] Number
  * [Option value unit] seconds
  * [Default value] 10
- * [Applicable socket types] all, when using multicast transports
- *
- * == ZMQ::RECOVERY_IVL_MSEC: Set multicast recovery interval in milliseconds
- * The ZMQ::RECOVERY_IVL_MSEC option shall set the recovery interval, specified
- * in milliseconds (ms) for multicast transports using the specified socket. The
- * recovery interval determines the maximum time in milliseconds that a receiver
- * can be absent from a multicast group before unrecoverable data loss will occur.
- *
- * A non-zero value of the ZMQ::RECOVERY_IVL_MSEC option will take precedence over
- * the ZMQ::RECOVERY_IVL option, but since the default for the
- * ZMQ::RECOVERY_IVL_MSEC is -1, the default is to use the ZMQ::RECOVERY_IVL option
- * value.
- *
- * <bCaution:</b> Exercise care when setting large recovery intervals as the data
- * needed for recovery will be held in memory. For example, a 1 minute recovery
- * interval at a data rate of 1Gbps requires a 7GB in-memory buffer.
- *
- * [Option value type] Integer
- * [Option value unit] milliseconds
- * [Default value] -1
  * [Applicable socket types] all, when using multicast transports
  *
  * == ZMQ::MCAST_LOOP: Control multicast loopback (0MQ 2.x only)
@@ -1535,7 +1510,9 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     case ZMQ_BACKLOG:
 #if ZMQ_VERSION >= 20101
     case ZMQ_RECONNECT_IVL_MAX:
+#  if ZMQ_VERSION_MAJOR == 2
     case ZMQ_RECOVERY_IVL_MSEC:
+#  endif
 #endif
 #if ZMQ_VERSION >= 20200
     case ZMQ_SNDTIMEO:
@@ -1550,10 +1527,17 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     case ZMQ_RCVBUF:
 #endif
         {
-            int optval = FIX2INT (optval_);
+            int opt = FIX2INT(option_);
+            int optval = NUM2INT(optval_);
+
+            if (NUM2INT(option_) == ZMQ_RECOVERY_IVL) {
+#if ZMQ_VERSION_MAJOR == 3
+              optval *= 1000;
+#endif
+            }
 
             //  Forward the code to native 0MQ library.
-            rc = zmq_setsockopt (s->socket, NUM2INT (option_),
+            rc = zmq_setsockopt (s->socket, opt,
                 (void*) &optval, sizeof (optval));
         }
         break;
@@ -1942,7 +1926,9 @@ void Init_zmq ()
 #endif
 #if ZMQ_VERSION >= 20101
     rb_define_const (zmq_module, "RECONNECT_IVL_MAX", INT2NUM (ZMQ_RECONNECT_IVL_MAX));
+#  if ZMQ_VERSION_MAJOR == 2
     rb_define_const (zmq_module, "RECOVERY_IVL_MSEC", INT2NUM (ZMQ_RECOVERY_IVL_MSEC));
+#  endif
 #endif
 #if ZMQ_VERSION >= 20200
     rb_define_const (zmq_module, "SNDTIMEO", INT2NUM (ZMQ_SNDTIMEO));
