@@ -812,7 +812,7 @@ static VALUE context_socket (VALUE self_, VALUE type_)
  * [Default value] -1
  * [Applicable socket types] all, when using multicast transports
  *
- * == ZMQ::MCAST_LOOP: Control multicast loopback
+ * == ZMQ::MCAST_LOOP: Control multicast loopback (0MQ 2.x only)
  * The ZMQ::MCAST_LOOP option controls whether data sent via multicast transports
  * can also be received by the sending host via loopback. A value of zero
  * indicates that the loopback functionality is disabled, while the default
@@ -1052,6 +1052,13 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
   case ZMQ_SNDTIMEO:
   case ZMQ_RCVTIMEO:
 #endif
+#if ZMQ_VERSION >= 32000
+  case ZMQ_RCVMORE:
+  case ZMQ_RATE:
+  case ZMQ_RECOVERY_IVL:
+  case ZMQ_SNDBUF:
+  case ZMQ_RCVBUF:
+#endif
         {
             int optval;
             size_t optvalsize = sizeof(optval);
@@ -1071,17 +1078,19 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
         }
         break;
 #endif
-    case ZMQ_RCVMORE:
     case ZMQ_HWM:
 #ifdef ZMQ_SWAP
     case ZMQ_SWAP:
 #endif
     case ZMQ_AFFINITY:
+#if ZMQ_VERSION < 32000
+    case ZMQ_RCVMORE:
     case ZMQ_RATE:
     case ZMQ_RECOVERY_IVL:
     case ZMQ_MCAST_LOOP:
     case ZMQ_SNDBUF:
     case ZMQ_RCVBUF:
+#endif
         {
             int64_t optval;
             size_t optvalsize = sizeof(optval);
@@ -1278,7 +1287,7 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
  * [Default value] -1
  * [Applicable socket types] all, when using multicast transports
  *
- * == ZMQ::MCAST_LOOP: Control multicast loopback
+ * == ZMQ::MCAST_LOOP: Control multicast loopback (0MQ 2.x only)
  * The ZMQ::MCAST_LOOP option shall control whether data sent via multicast
  * transports using the specified _socket_ can also be received by the sending
  * host via loopback. A value of zero disables the loopback functionality, while
@@ -1407,11 +1416,13 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     case ZMQ_SWAP:
 #endif
     case ZMQ_AFFINITY:
+#if ZMQ_VERSION < 32000
     case ZMQ_RATE:
     case ZMQ_RECOVERY_IVL:
     case ZMQ_MCAST_LOOP:
     case ZMQ_SNDBUF:
     case ZMQ_RCVBUF:
+#endif
 	    {
 	        uint64_t optval = FIX2LONG (optval_);
 
@@ -1432,6 +1443,12 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
 #if ZMQ_VERSION >= 20200
     case ZMQ_SNDTIMEO:
     case ZMQ_RCVTIMEO:
+#endif
+#if ZMQ_VERSION >= 32000
+    case ZMQ_RATE:
+    case ZMQ_RECOVERY_IVL:
+    case ZMQ_SNDBUF:
+    case ZMQ_RCVBUF:
 #endif
         {
             int optval = FIX2INT (optval_);
@@ -1806,7 +1823,9 @@ void Init_zmq ()
     rb_define_const (zmq_module, "UNSUBSCRIBE", INT2NUM (ZMQ_UNSUBSCRIBE));
     rb_define_const (zmq_module, "RATE", INT2NUM (ZMQ_RATE));
     rb_define_const (zmq_module, "RECOVERY_IVL", INT2NUM (ZMQ_RECOVERY_IVL));
+#if ZMQ_VERSION < 32000
     rb_define_const (zmq_module, "MCAST_LOOP", INT2NUM (ZMQ_MCAST_LOOP));
+#endif
     rb_define_const (zmq_module, "SNDBUF", INT2NUM (ZMQ_SNDBUF));
     rb_define_const (zmq_module, "RCVBUF", INT2NUM (ZMQ_RCVBUF));
     rb_define_const (zmq_module, "SNDMORE", INT2NUM (ZMQ_SNDMORE));
