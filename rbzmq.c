@@ -1095,7 +1095,7 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
   case ZMQ_SNDTIMEO:
   case ZMQ_RCVTIMEO:
 #endif
-#if ZMQ_VERSION >= 32000
+#if ZMQ_VERSION_MAJOR == 3
   case ZMQ_SNDHWM:
   case ZMQ_RCVHWM:
   case ZMQ_RCVMORE:
@@ -1136,7 +1136,7 @@ static VALUE socket_getsockopt (VALUE self_, VALUE option_)
     case ZMQ_SWAP:
 #endif
     case ZMQ_AFFINITY:
-#if ZMQ_VERSION < 32000
+#if ZMQ_VERSION_MAJOR == 2
     case ZMQ_HWM:
     case ZMQ_RCVMORE:
     case ZMQ_RATE:
@@ -1487,7 +1487,7 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     case ZMQ_SWAP:
 #endif
     case ZMQ_AFFINITY:
-#if ZMQ_VERSION < 32000
+#if ZMQ_VERSION_MAJOR == 2
     case ZMQ_HWM:
     case ZMQ_RATE:
     case ZMQ_RECOVERY_IVL:
@@ -1518,7 +1518,7 @@ static VALUE socket_setsockopt (VALUE self_, VALUE option_,
     case ZMQ_SNDTIMEO:
     case ZMQ_RCVTIMEO:
 #endif
-#if ZMQ_VERSION >= 32000
+#if ZMQ_VERSION_MAJOR == 3
     case ZMQ_SNDHWM:
     case ZMQ_RCVHWM:
     case ZMQ_RATE:
@@ -1905,7 +1905,7 @@ void Init_zmq ()
     rb_define_const (zmq_module, "UNSUBSCRIBE", INT2NUM (ZMQ_UNSUBSCRIBE));
     rb_define_const (zmq_module, "RATE", INT2NUM (ZMQ_RATE));
     rb_define_const (zmq_module, "RECOVERY_IVL", INT2NUM (ZMQ_RECOVERY_IVL));
-#if ZMQ_VERSION < 32000
+#if ZMQ_VERSION_MAJOR == 2
     rb_define_const (zmq_module, "MCAST_LOOP", INT2NUM (ZMQ_MCAST_LOOP));
     rb_define_const (zmq_module, "HWM", INT2NUM (ZMQ_HWM));
 #else
