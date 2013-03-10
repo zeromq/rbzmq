@@ -19,6 +19,8 @@
 require 'mkmf'
 dir_config('zmq')
 
+$libs += ' -lstdc++ '
+
 $CFLAGS += ' -std=c99'
 CONFIG['warnflags'].gsub!(/-Wdeclaration-after-statement|-Wunused-parameter/, '') if CONFIG['warnflags']
 
