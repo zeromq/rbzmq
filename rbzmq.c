@@ -170,7 +170,7 @@ static VALUE context_initialize (int argc_, VALUE* argv_, VALUE self_)
     Data_Get_Struct (self_, void, ctx);
 
     assert (ctx->context == NULL);
-    void *zctx = zmq_init (NIL_P (io_threads) ? 1 : NUM2INT (io_threads));
+    void *zctx = zmq_ctx_new();
     if (!zctx) {
         rb_raise (exception_type, "%s", zmq_strerror (zmq_errno ()));
         return Qnil;
